@@ -21,7 +21,9 @@ type SoundId =
   | 'flatline'
   | 'click'
   | 'success'
-  | 'fail';
+  | 'fail'
+  | 'horn'
+  | 'crash';
 
 const HEAR = 55;
 
@@ -57,6 +59,8 @@ export class AudioSystem {
     this.sounds.set('click', mk(synth.click(), { volume: 0.4 }));
     this.sounds.set('success', mk(synth.chime([293.66, 369.99, 440, 587.33, 739.99], 0.14, 0.8), { volume: 0.55 }));
     this.sounds.set('fail', mk(synth.chime([293.66, 277.18, 220, 146.83], 0.22, 0.9), { volume: 0.55 }));
+    this.sounds.set('horn', mk(synth.horn(), { volume: 0.4, pool: 6 }));
+    this.sounds.set('crash', mk(synth.carCrash(), { volume: 0.7, pool: 6 }));
     this.rain = mk(synth.rainLoop(), { volume: 0, loop: true, pool: 1 });
     this.pad = mk(synth.padLoop(), { volume: 0, loop: true, pool: 1 });
     this.combat = mk(synth.combatLoop(), { volume: 0, loop: true, pool: 1 });
@@ -132,6 +136,16 @@ export class AudioSystem {
         case 'objective':
           this.play('objective');
           break;
+        case 'horn': {
+          const { vol, pan } = this.spatial(ev.x, ev.y, listener, yaw);
+          if (vol > 0.05) this.play('horn', vol, pan, 0.95 + Math.random() * 0.1);
+          break;
+        }
+        case 'carHit': {
+          const { vol, pan } = this.spatial(ev.x, ev.y, listener, yaw);
+          if (vol > 0.05) this.play('crash', vol, pan);
+          break;
+        }
         case 'alarm':
           this.play('siren', 0.6);
           break;

@@ -19,6 +19,25 @@ export function randomPedestrianSpot(world: World, avoid: Vec2 | null, minDist: 
   return nav.nearestWalkable(map.w / 2, map.h / 2);
 }
 
+/** Nearest sidewalk cell to `p` (used so newcomers never appear in a traffic lane). */
+export function nearestSidewalk(world: World, p: Vec2, maxR = 10): Vec2 {
+  const { map } = world;
+  const cx = Math.floor(p.x);
+  const cy = Math.floor(p.y);
+  for (let r = 0; r <= maxR; r++) {
+    for (let oy = -r; oy <= r; oy++) {
+      for (let ox = -r; ox <= r; ox++) {
+        if (Math.max(Math.abs(ox), Math.abs(oy)) !== r) continue;
+        const x = cx + ox;
+        const y = cy + oy;
+        if (x < 1 || y < 1 || x >= map.w - 1 || y >= map.h - 1) continue;
+        if (map.ground[y * map.w + x] === GROUND_SIDEWALK && !map.blocked[y * map.w + x]) return { x: x + 0.5, y: y + 0.5 };
+      }
+    }
+  }
+  return p;
+}
+
 export function spawnCivilian(world: World, at: Vec2): Entity {
   const e = world.spawn('civilian', 'civ', at.x, at.y, world.rng.pick(CIV_NAMES));
   e.hp = e.maxHp = 25;
@@ -62,8 +81,9 @@ export function populate(world: World, squad: AgentDef[]): void {
   const { map, nav, rng, content } = world;
   const mission = content.mission;
 
-  for (const p of map.intersections) world.flowWander.push(nav.addFlowTarget(p));
-  for (const p of map.exits) world.flowExits.push(nav.addFlowTarget(p));
+  // Pedestrians wander between points spread over sidewalks, alleys and the plaza.
+  for (let i = 0; i < 28; i++) world.flowWander.push(nav.addFlowTarget(randomPedestrianSpot(world, null, 0), 'walk'));
+  for (const p of map.exits) world.flowExits.push(nav.addFlowTarget(p, 'flee'));
 
   // Squad.
   const offsets = [
@@ -98,7 +118,7 @@ export function populate(world: World, squad: AgentDef[]): void {
   const pc = { x: pz.x + pz.w / 2, y: pz.y + pz.h / 2 };
   const target = world.spawn('target', 'enemy', pc.x + 2.6, pc.y + 0.5, mission.targetName);
   target.hp = target.maxHp = 70;
-  target.speed = 3.4;
+  target.speed = 3.1;
   target.ai = 'idle';
   target.post = { x: target.x, y: target.y };
   world.targetId = target.id;
@@ -123,12 +143,14 @@ export function populate(world: World, squad: AgentDef[]): void {
   const ring = byDist.slice(0, Math.min(6, byDist.length));
   for (let i = 0; i < mission.population.rivals; i += 2) {
     const start = ring[(i / 2) % ring.length];
-    const route = [start, ring[(i / 2 + 1) % ring.length], ring[(i / 2 + 3) % ring.length]].map((p) => ({ ...p }));
-    const lead = spawnRival(world, start);
+    const route = [start, ring[(i / 2 + 1) % ring.length], ring[(i / 2 + 3) % ring.length]].map((p, k) =>
+      nearestSidewalk(world, { x: p.x + (k % 2 ? 5 : -5), y: p.y + (k < 2 ? 5 : -5) }),
+    );
+    const lead = spawnRival(world, route[0]);
     lead.patrol = route;
     lead.patrolIdx = 1;
     if (i + 1 < mission.population.rivals) {
-      const mate = spawnRival(world, { x: start.x + 1, y: start.y + 1 });
+      const mate = spawnRival(world, { x: route[0].x + 0.8, y: route[0].y + 0.8 });
       mate.patrol = route;
       mate.patrolIdx = 1;
       mate.followId = lead.id;

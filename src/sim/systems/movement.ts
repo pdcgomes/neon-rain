@@ -1,3 +1,4 @@
+import { GROUND_ROAD } from '../map.ts';
 import { DT } from '../time.ts';
 import type { Entity } from '../types.ts';
 import type { World } from '../world.ts';
@@ -30,11 +31,16 @@ export function trailPoint(leader: Entity, back: number): { x: number; y: number
   return { x: px, y: py };
 }
 
+function onRoad(world: World, x: number, y: number): boolean {
+  const { map } = world;
+  return map.ground[Math.floor(y) * map.w + Math.floor(x)] === GROUND_ROAD;
+}
+
 export function goTo(world: World, e: Entity, x: number, y: number, repathEvery = 0.8): void {
   const end = e.path && e.path.length ? e.path[e.path.length - 1] : null;
   const moved = !end || Math.hypot(end.x - x, end.y - y) > 1.5;
   if (!e.path || (moved && world.time >= e.repathAt)) {
-    e.path = world.nav.findPath(e.x, e.y, x, y, e.radius, 6000);
+    e.path = world.nav.findPath(e.x, e.y, x, y, e.radius, 16000, e.kind === 'agent' ? 0.4 : 3);
     e.pathIdx = 0;
     e.repathAt = world.time + repathEvery;
   }
@@ -146,7 +152,7 @@ export function movementSystem(world: World): void {
     // Accelerate toward desired velocity. Agents are snappy: no wind-up, no turning delay.
     const w = world.weapon(e);
     const firingSlow = (e.firing || e.autoFire) && w ? w.moveMul : 1;
-    const maxSpeed = e.speed * speedMul(e) * firingSlow;
+    const maxSpeed = e.speed * speedMul(e) * firingSlow * e.pace;
     const accel = e.kind === 'agent' ? 60 : 24;
     const tx = e.dvx * maxSpeed;
     const ty = e.dvy * maxSpeed;
@@ -174,15 +180,23 @@ export function movementSystem(world: World): void {
       sy += ((e.y - o.y) / d) * push;
     });
 
-    const dx = (e.vx + sx * 3.5) * DT;
-    const dy = (e.vy + sy * 3.5) * DT;
-    const next = nav.slide(e.x, e.y, dx, dy, e.radius);
+    // Someone waiting for the lights holds their ground instead of being jostled into traffic.
+    const waiting = e.dvx === 0 && e.dvy === 0 && (e.ai === 'wander' || (e.kind === 'police' && e.ai === 'patrol'));
+    const push = waiting ? 0 : 3.5;
+    const dx = (e.vx + sx * push) * DT;
+    const dy = (e.vy + sy * push) * DT;
+    let next = nav.slide(e.x, e.y, dx, dy, e.radius);
+    if (waiting && onRoad(world, next.x, next.y) && !onRoad(world, e.x, e.y)) {
+      next = { x: e.x, y: e.y };
+      e.vx = 0;
+      e.vy = 0;
+    }
     const wanted = Math.hypot(dx, dy);
     const got = Math.hypot(next.x - e.x, next.y - e.y);
     e.stuckTicks = e.path && wanted > 0.02 && got < wanted * 0.2 ? e.stuckTicks + 1 : 0;
     if (e.stuckTicks > 12 && e.path) {
       const end = e.path[e.path.length - 1];
-      e.path = nav.findPath(next.x, next.y, end.x, end.y, e.radius);
+      e.path = nav.findPath(next.x, next.y, end.x, end.y, e.radius, 12000, e.kind === 'agent' ? 0.4 : 3);
       e.pathIdx = 0;
       e.stuckTicks = 0;
     }

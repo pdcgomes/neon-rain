@@ -8,6 +8,9 @@ export interface BuildingBox {
   max: THREE.Vector3;
   fade: number;
   target: number;
+  /** Keeps a building ghosted briefly after it stops occluding, so it doesn't flicker. */
+  holdUntil: number;
+  hidden: boolean;
 }
 
 const BUILDING_VERT_HEAD = /* glsl */ `
@@ -138,6 +141,12 @@ export class City {
   private fadeAttr!: THREE.InstancedBufferAttribute;
   private flickers: { mat: THREE.MeshBasicMaterial; base: number; seed: number }[] = [];
   private beacons!: THREE.InstancedMesh;
+  private roof!: THREE.InstancedMesh;
+  private roofOwners: number[] = [];
+  private roofMatrices: THREE.Matrix4[] = [];
+  private beaconOwners: number[] = [];
+  private beaconMatrices: THREE.Matrix4[] = [];
+  private signsByBuilding = new Map<number, THREE.Mesh[]>();
   private holo!: THREE.Mesh;
   vtolBeam!: THREE.Mesh;
   vtolPad!: THREE.Mesh;
@@ -241,6 +250,8 @@ export class City {
         max: new THREE.Vector3(b.x + b.w, b.height, b.y + b.h),
         fade: 1,
         target: 1,
+        holdUntil: 0,
+        hidden: false,
       });
       // Rooftop clutter: AC units and water tanks.
       const bits = 1 + Math.floor(hash2(b.id, 5) * 4);
@@ -248,6 +259,7 @@ export class City {
         const s = 0.8 + hash2(b.id, k + 10) * 1.6;
         const px = b.x + 1 + hash2(b.id, k + 20) * Math.max(0, b.w - 2);
         const pz = b.y + 1 + hash2(b.id, k + 30) * Math.max(0, b.h - 2);
+        this.roofOwners.push(i);
         roofBits.push(
           new THREE.Matrix4().compose(
             new THREE.Vector3(px, b.height, pz),
@@ -256,6 +268,7 @@ export class City {
           ),
         );
       }
+      if (b.height > 24) this.beaconOwners.push(i);
       if (b.height > 24) beaconPos.push(new THREE.Vector3(b.x + b.w / 2, b.height + 1.2, b.y + b.h / 2));
     });
     geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 1));
@@ -271,6 +284,8 @@ export class City {
       roofBits.length,
     );
     roofBits.forEach((mm, i) => roof.setMatrixAt(i, mm));
+    this.roof = roof;
+    this.roofMatrices = roofBits;
     roof.castShadow = true;
     this.group.add(roof);
 
@@ -280,7 +295,8 @@ export class City {
       Math.max(1, beaconPos.length),
     );
     this.beacons.count = beaconPos.length;
-    beaconPos.forEach((p, i) => this.beacons.setMatrixAt(i, new THREE.Matrix4().makeTranslation(p.x, p.y, p.z)));
+    this.beaconMatrices = beaconPos.map((p) => new THREE.Matrix4().makeTranslation(p.x, p.y, p.z));
+    this.beaconMatrices.forEach((mm, i) => this.beacons.setMatrixAt(i, mm));
     this.group.add(this.beacons);
   }
 
@@ -344,6 +360,9 @@ export class City {
         if (vertical) sign.rotation.y = face.nx !== 0 ? 0 : Math.PI / 2;
         else sign.rotation.y = Math.atan2(face.nx, face.nz);
         this.group.add(sign);
+        const list = this.signsByBuilding.get(b.id) ?? [];
+        list.push(sign);
+        this.signsByBuilding.set(b.id, list);
         glows.push({
           x: fx + face.nx * 2.5,
           z: fz + face.nz * 2.5,
@@ -593,14 +612,35 @@ export class City {
       this.holo.position.y = 3.2 + Math.sin(time * 1.5) * 0.15;
     }
     let dirty = false;
+    const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+    let roofDirty = false;
+    let beaconDirty = false;
     this.boxes.forEach((b, i) => {
-      const nf = b.fade + (b.target - b.fade) * 0.18;
-      if (Math.abs(nf - b.fade) > 0.002) {
+      const k = b.target < b.fade ? 0.3 : 0.12;
+      let nf = b.fade + (b.target - b.fade) * k;
+      if (Math.abs(nf - b.target) < 0.02) nf = b.target;
+      if (nf !== b.fade) {
         b.fade = nf;
         this.setFade(i, nf);
         dirty = true;
       }
+      const hide = b.fade < 0.6;
+      if (hide === b.hidden) return;
+      b.hidden = hide;
+      for (const sign of this.signsByBuilding.get(this.map.buildings[i].id) ?? []) sign.visible = !hide;
+      this.roofOwners.forEach((owner, r) => {
+        if (owner !== i) return;
+        this.roof.setMatrixAt(r, hide ? zero : this.roofMatrices[r]);
+        roofDirty = true;
+      });
+      this.beaconOwners.forEach((owner, r) => {
+        if (owner !== i) return;
+        this.beacons.setMatrixAt(r, hide ? zero : this.beaconMatrices[r]);
+        beaconDirty = true;
+      });
     });
+    if (roofDirty) this.roof.instanceMatrix.needsUpdate = true;
+    if (beaconDirty) this.beacons.instanceMatrix.needsUpdate = true;
     if (dirty) this.fadeAttr.needsUpdate = true;
   }
 }

@@ -9,7 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "sim:smoke": "node scripts/sim-smoke.ts"
+    "sim:smoke": "node scripts/sim-smoke.ts",
+    "sim:traffic": "node scripts/traffic-check.ts"
   },
   "dependencies": {
     "howler": "^2.2.4",

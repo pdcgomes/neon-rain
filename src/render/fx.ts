@@ -267,7 +267,7 @@ export class Fx {
       this.spinnerData.push({
         x: road.axis === 0 ? road.c + (hash2(i, 3, 4) - 0.5) * 4 : along,
         z: road.axis === 1 ? road.c + (hash2(i, 3, 4) - 0.5) * 4 : along,
-        y: 26 + hash2(i, 5, 4) * 30,
+        y: 48 + hash2(i, 5, 4) * 26,
         dir: hash2(i, 6, 4) > 0.5 ? 1 : -1,
         axis: road.axis,
         speed: 10 + hash2(i, 7, 4) * 14,
@@ -340,6 +340,10 @@ export class Fx {
           if (ev.faction === 'player' && ev.weapon === 'minigun') this.shake += 0.02;
           break;
         }
+        case 'carHit':
+          this.burst(ev.x, 0.9, ev.y, 12, 5, [2.6, 2.2, 1.6], 0.12, 0.4);
+          this.shake += Math.min(0.4, ev.speed * 0.03);
+          break;
         case 'impact':
           this.burst(ev.x, 1.2, ev.y, 5, 5, [3, 2.2, 1.2], 0.12, 0.35);
           break;
@@ -513,10 +517,11 @@ export class Fx {
       if (s.axis === 0) s.z += s.dir * s.speed * dt;
       else s.x += s.dir * s.speed * dt;
       const L = this.mapSize;
-      if (s.x < -40) s.x += L + 80;
-      if (s.x > L + 40) s.x -= L + 80;
-      if (s.z < -40) s.z += L + 80;
-      if (s.z > L + 40) s.z -= L + 80;
+      // Wrap inside the city bounds so flying traffic never crosses the skyline ring outside it.
+      if (s.x < -4) s.x += L + 8;
+      if (s.x > L + 4) s.x -= L + 8;
+      if (s.z < -4) s.z += L + 8;
+      if (s.z > L + 4) s.z -= L + 8;
       const yaw = s.axis === 0 ? (s.dir > 0 ? 0 : Math.PI) : s.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
       this.q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
       this.m.compose(this.v.set(s.x, s.y + Math.sin(time + i) * 0.3, s.z), this.q, this.s.set(1, 1, 1));

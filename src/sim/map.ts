@@ -41,6 +41,13 @@ export interface CityMap {
   seed: number;
   ground: Uint8Array;
   blocked: Uint8Array;
+  /**
+   * Pedestrian crossings just outside each intersection: 0 = none, 1 = crosses a road whose traffic
+   * runs along x, 2 = crosses a road whose traffic runs along y.
+   */
+  crosswalk: Uint8Array;
+  /** Intersection index (i * roadsY.length + j) each crosswalk cell belongs to, -1 if none. */
+  crosswalkNode: Int16Array;
   buildings: Building[];
   props: Prop[];
   roadsX: Band[];
@@ -257,6 +264,27 @@ export function generateCity(seed: number, params: MapParams): CityMap {
     blocked[y * W + W - 1] = 1;
   }
 
+  const crosswalk = new Uint8Array(W * H);
+  const crosswalkNode = new Int16Array(W * H).fill(-1);
+  const mark = (x: number, y: number, kind: number, node: number) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    crosswalk[y * W + x] = kind;
+    crosswalkNode[y * W + x] = node;
+  };
+  bx.roads.forEach((rx, i) => {
+    by.roads.forEach((ry, j) => {
+      const node = i * by.roads.length + j;
+      // Strips across the vertical road (its traffic runs along y).
+      for (const [y0, y1] of [[ry.start - 2, ry.start], [ry.end, ry.end + 2]]) {
+        for (let y = y0; y < y1; y++) for (let x = rx.start; x < rx.end; x++) mark(x, y, 2, node);
+      }
+      // Strips across the horizontal road (its traffic runs along x).
+      for (const [x0, x1] of [[rx.start - 2, rx.start], [rx.end, rx.end + 2]]) {
+        for (let x = x0; x < x1; x++) for (let y = ry.start; y < ry.end; y++) mark(x, y, 1, node);
+      }
+    });
+  });
+
   const center = (b: Band) => (b.start + b.end) / 2;
   const intersections: Vec2[] = [];
   for (const rx of bx.roads) for (const ry of by.roads) intersections.push({ x: center(rx), y: center(ry) });
@@ -267,8 +295,11 @@ export function generateCity(seed: number, params: MapParams): CityMap {
   const nearest = (pts: Vec2[], x: number, y: number) =>
     pts.reduce((a, b) => (Math.hypot(a.x - x, a.y - y) <= Math.hypot(b.x - x, b.y - y) ? a : b));
 
-  const spawn = nearest(intersections, W * 0.12, H * 0.88);
-  const extraction = nearest(intersections, W * 0.12, H * 0.12);
+  // Spawn and extraction sit on the sidewalk corner of an intersection, out of the traffic lanes.
+  const corner = params.roadWidth / 2 + 1;
+  const cornerOf = (p: Vec2, sx: number, sy: number) => ({ x: p.x + sx * corner, y: p.y + sy * corner });
+  const spawn = cornerOf(nearest(intersections, W * 0.12, H * 0.88), -1, 1);
+  const extraction = cornerOf(nearest(intersections, W * 0.12, H * 0.12), -1, -1);
   const escape = nearest(exits, W - 2.5, H * 0.55);
   props.push({ kind: 'vtol', x: extraction.x, y: extraction.y, w: 0, h: 0, rot: 0, seed: 0 });
 
@@ -278,6 +309,8 @@ export function generateCity(seed: number, params: MapParams): CityMap {
     seed,
     ground,
     blocked,
+    crosswalk,
+    crosswalkNode,
     buildings,
     props,
     roadsX: bx.roads,

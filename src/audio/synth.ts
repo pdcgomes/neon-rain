@@ -262,3 +262,27 @@ export function combatLoop(): string {
   }, 31);
   return wav([normalize(a, 0.5)]);
 }
+
+/** Two-tone car horn with a slightly detuned, squashed square wave. */
+export function horn(): string {
+  const a = render(0.55, (t) => {
+    const env = Math.min(1, t * 40, (0.55 - t) * 12);
+    const sq = (f: number) => Math.tanh(Math.sin(2 * Math.PI * f * t) * 4);
+    return (sq(392) + sq(494) * 0.8) * env * 0.35;
+  });
+  lowpass(a, () => 2600);
+  return wav([normalize(a, 0.45)]);
+}
+
+/** Car impact: metallic crunch over a body thud. */
+export function carCrash(): string {
+  let ph = 0;
+  const a = render(0.5, (t, _i, r) => {
+    ph += (2 * Math.PI * (70 + 90 * Math.exp(-t / 0.04))) / SR;
+    const thud = Math.sin(ph) * env(t, 0.001, 0.09);
+    const crunch = (r() * 2 - 1) * env(t, 0.001, 0.07) * (0.6 + 0.4 * Math.sin(2 * Math.PI * 1830 * t));
+    return thud + crunch * 0.8;
+  }, 17);
+  lowpass(a, (t) => 6000 * Math.exp(-t / 0.1) + 500);
+  return wav([normalize(a, 0.8)]);
+}

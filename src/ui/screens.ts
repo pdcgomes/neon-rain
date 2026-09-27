@@ -69,7 +69,9 @@ export function showBriefing(mission: MissionDef, save: Save, onDeploy: () => vo
           <div><b>G</b> split squad · <b>T</b> switch team</div>
           <div><b>Z X C V</b> weapon · <b>H</b> holster</div>
           <div><b>Space</b> hold for Neural Overdrive</div>
-          <div><b>Q / E</b> rotate · <b>Wheel</b> zoom · <b>WASD</b> pan</div>
+          <div><b>Middle drag</b> or <b>Alt+drag</b> orbit camera</div>
+          <div><b>Q / E</b> rotate · <b>Shift+wheel</b> pitch · <b>Y</b> top-down</div>
+          <div><b>Wheel</b> zoom · <b>WASD</b> pan · <b>F</b> reset view</div>
         </div>
         <div class="brief-memorial">Memorial Wall: ${save.fallen.length} agent${save.fallen.length === 1 ? '' : 's'} decommissioned</div>
         <button class="btn deploy">DEPLOY ▸</button>

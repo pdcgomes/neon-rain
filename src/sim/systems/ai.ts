@@ -94,6 +94,7 @@ function combatAi(world: World, e: Entity): void {
     }
   }
 
+  e.pace = e.ai === 'combat' ? 1 : 0.4;
   if (e.ai === 'combat') {
     const t = world.get(e.targetId);
     if (t && t.alive) {
@@ -162,8 +163,22 @@ function nearestAgent(world: World, e: Entity): Entity | null {
 }
 
 function targetAi(world: World, e: Entity): void {
+  // Voss runs for his limousine, limping as he takes hits.
+  e.pace = e.ai === 'escape' ? 0.55 + 0.45 * (e.hp / e.maxHp) : 0.35;
   if (e.ai === 'escape') {
-    goTo(world, e, world.map.escape.x, world.map.escape.y, 1.5);
+    // Flee along the precomputed field to the limousine's exit; no pathfinding needed.
+    if (e.flowIdx < 0 || !world.flowExits.includes(e.flowIdx)) {
+      const es = world.map.escape;
+      e.flowIdx = world.flowExits.reduce((best, f) => {
+        const a = world.nav.flowTargets[f];
+        const b = world.nav.flowTargets[best];
+        return Math.hypot(a.x - es.x, a.y - es.y) < Math.hypot(b.x - es.x, b.y - es.y) ? f : best;
+      }, world.flowExits[0]);
+    }
+    e.path = null;
+    const d = world.nav.flowDir(e.flowIdx, e.x, e.y);
+    e.dvx = d.x;
+    e.dvy = d.y;
     return;
   }
   if (world.time >= e.thinkAt && e.post) {

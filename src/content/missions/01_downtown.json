@@ -3,7 +3,12 @@
   "codename": "NEON RAIN",
   "city": "Neo-Lisboa // Sector 7",
   "seed": 7717,
-  "map": { "size": 120, "blockMin": 20, "blockMax": 28, "roadWidth": 8 },
+  "map": {
+    "size": 120,
+    "blockMin": 20,
+    "blockMax": 28,
+    "roadWidth": 8
+  },
   "briefing": [
     "Good evening, Agents. Eurocorp thanks you for your continued ownership.",
     "Director Hale Voss of Kaiju Dynamics has been negotiating to sell Sector 7's neural-chip contracts to a competitor. This is regrettable, and it will be corrected.",
@@ -14,11 +19,27 @@
   "targetName": "Director Hale Voss",
   "targetCorp": "Kaiju Dynamics",
   "objectives": [
-    { "id": "kill", "text": "Eliminate Director Hale Voss" },
-    { "id": "extract", "text": "Reach the extraction VTOL" }
+    {
+      "id": "kill",
+      "text": "Eliminate Director Hale Voss"
+    },
+    {
+      "id": "extract",
+      "text": "Reach the extraction VTOL"
+    }
   ],
-  "bonus": { "id": "persuade_guards", "text": "Persuade Voss's bodyguards" },
-  "population": { "civilians": 110, "police": 8, "rivals": 6, "guards": 3, "heavies": 1 },
+  "bonus": {
+    "id": "persuade_guards",
+    "text": "Persuade Voss's bodyguards"
+  },
+  "population": {
+    "civilians": 110,
+    "police": 8,
+    "rivals": 6,
+    "guards": 3,
+    "heavies": 1,
+    "traffic": 16
+  },
   "policeHostileAt": 40,
   "enforcersAt": 70
 }

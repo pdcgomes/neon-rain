@@ -83,7 +83,8 @@ export class Hud {
       '<b>LMB+RMB</b> grenade',
       '<b>1-4</b> agent · <b>Tab</b> all · <b>G</b> split · <b>T</b> team',
       '<b>Z X C V</b> weapons · <b>H</b> holster',
-      '<b>Space</b> overdrive · <b>Q/E</b> rotate · <b>WASD</b> pan',
+      '<b>Space</b> overdrive · <b>WASD</b> pan · <b>F</b> reset view',
+      '<b>MMB/Alt+drag</b> orbit · <b>Q/E</b> rotate · <b>Shift+wheel</b> pitch · <b>Y</b> top-down',
     ].join('<br>');
 
     root.append(squad, top, mapWrap, this.weapons, this.log, this.banner, this.stats, this.overdrive, help);

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { SimEvent } from '../sim/types.ts';
 import type { World } from '../sim/world.ts';
 import { Actors } from './actors.ts';
+import { TrafficLights, Vehicles } from './vehicles.ts';
 import { CameraRig } from './camera.ts';
 import { City } from './cityBuilder.ts';
 import { Fx } from './fx.ts';
@@ -55,6 +56,8 @@ export class GameRenderer {
   readonly city: City;
   readonly fx: Fx;
   private actors = new Actors();
+  private vehicles = new Vehicles();
+  private lights: TrafficLights;
   private rain = new Rain();
   private post: PostFX;
   private moon: THREE.DirectionalLight;
@@ -67,7 +70,8 @@ export class GameRenderer {
   private occRay = new THREE.Ray();
   private occHit = new THREE.Vector3();
   private occDir = new THREE.Vector3();
-  private occPts: THREE.Vector3[] = Array.from({ length: 12 }, () => new THREE.Vector3());
+  private occPts: THREE.Vector3[] = Array.from({ length: 16 }, () => new THREE.Vector3());
+  private occMargins = new Float32Array(16);
 
   constructor(canvas: HTMLCanvasElement, world: World) {
     this.canvas = canvas;
@@ -103,7 +107,8 @@ export class GameRenderer {
     this.rig = new CameraRig(1, { w: world.map.w, h: world.map.h });
     this.city = new City(world.map);
     this.fx = new Fx(this.scene, world);
-    this.scene.add(this.city.group, this.actors.group, this.fx.group, this.rain.mesh);
+    this.lights = new TrafficLights(world);
+    this.scene.add(this.city.group, this.actors.group, this.vehicles.group, this.lights.group, this.fx.group, this.rain.group);
 
     this.post = new PostFX(this.renderer, this.scene, this.rig.camera);
     this.resize();
@@ -158,27 +163,47 @@ export class GameRenderer {
     return best ?? ground;
   }
 
-  private updateOcclusion(): void {
+  /**
+   * Ghosts any building that sits between the camera and something the player needs to see:
+   * each agent (feet and head), the camera focus, the cursor, and the target when nearby.
+   * Boxes are widened so walls hugging an agent also fade, and stay faded briefly to avoid flicker.
+   */
+  private updateOcclusion(view: ViewState, time: number): void {
     const cam = this.rig.camera.position;
+    const pts = this.occPts;
+    const margins = this.occMargins;
     let n = 0;
-    this.occPts[n++].set(this.rig.target.x, 1, this.rig.target.z);
-    for (const a of this.world.livingAgents()) if (n < this.occPts.length) this.occPts[n++].set(a.x, 1, a.y);
+    const add = (x: number, y: number, z: number, m: number) => {
+      if (n >= pts.length) return;
+      pts[n].set(x, y, z);
+      margins[n++] = m;
+    };
+    add(this.rig.target.x, 1, this.rig.target.z, 2.5);
+    for (const a of this.world.livingAgents()) {
+      add(a.x, 0.3, a.y, 2.2);
+      add(a.x, 1.8, a.y, 1.4);
+    }
+    if (view.cursor) add(view.cursor.x, 0.5, view.cursor.z, 1.2);
+    const target = this.world.get(this.world.targetId);
+    if (target && target.alive && Math.hypot(target.x - this.rig.target.x, target.y - this.rig.target.z) < 30) {
+      add(target.x, 1, target.y, 1.5);
+    }
     const box = this.occBox;
     const ray = this.occRay;
     const hit = this.occHit;
     for (const b of this.city.boxes) {
-      box.set(b.min, b.max);
       let occludes = false;
-      for (let i = 0; i < n; i++) {
-        const d = this.occDir.subVectors(this.occPts[i], cam);
+      for (let i = 0; i < n && !occludes; i++) {
+        const m = margins[i];
+        box.min.set(b.min.x - m, b.min.y, b.min.z - m);
+        box.max.set(b.max.x + m, b.max.y + 0.5, b.max.z + m);
+        const d = this.occDir.subVectors(pts[i], cam);
         const len = d.length();
         ray.set(cam, d.divideScalar(len));
-        if (ray.intersectBox(box, hit) && hit.distanceTo(cam) < len - 0.5) {
-          occludes = true;
-          break;
-        }
+        if (ray.intersectBox(box, hit) && hit.distanceTo(cam) < len - 0.3 && pts[i].y < b.max.y) occludes = true;
       }
-      b.target = occludes ? 0 : 1;
+      if (occludes) b.holdUntil = time + 0.6;
+      b.target = occludes || time < b.holdUntil ? 0 : 1;
     }
   }
 
@@ -203,7 +228,7 @@ export class GameRenderer {
     this.moon.position.set(t.x + 40, 90, t.z + 25);
     this.moon.target.position.copy(t);
 
-    this.updateOcclusion();
+    this.updateOcclusion(view, time);
     this.city.update(time);
     const ex = this.city.vtolBeam;
     const extracting = world.phase === 'extract';
@@ -212,9 +237,11 @@ export class GameRenderer {
     this.city.escapeBeam.visible = world.alarm && world.phase === 'eliminate';
 
     this.actors.update(world, alpha, dt, time, view.selected);
+    this.vehicles.update(world, alpha, time);
+    this.lights.update(world);
     this.fx.update(world, alpha, dt, time, view);
     this.rainTime += dt * (view.overdrive ? 0.3 : 1);
-    this.rain.update(this.rainTime, t);
+    this.rain.update(this.rainTime, t, this.rig.camera.position);
     this.post.setOverdrive(view.overdrive ? 1 : 0);
     this.post.render(dt, time);
   }

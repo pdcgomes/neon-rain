@@ -44,6 +44,8 @@ export interface Entity {
   facing: number;
   radius: number;
   speed: number;
+  /** Fraction of top speed the AI wants right now (strolling vs running). */
+  pace: number;
   hp: number;
   maxHp: number;
   armor: number;
@@ -97,6 +99,7 @@ export interface Entity {
   panic: number;
   warnedAt: number;
   witnessedAt: number;
+  carHitAt: number;
   persuadeProgress: number;
   persuadeTick: number;
   persuadedBy: number;
@@ -139,6 +142,8 @@ export type SimEvent =
   | { t: 'bark'; id: number; text: string; tone: 'police' | 'enemy' | 'hq' | 'civ' }
   | { t: 'objective'; text: string }
   | { t: 'alarm' }
+  | { t: 'horn'; x: number; y: number }
+  | { t: 'carHit'; x: number; y: number; speed: number; victim: number; calm: boolean }
   | { t: 'mission'; result: 'success' | 'fail'; reason: string };
 
 export interface MissionStats {

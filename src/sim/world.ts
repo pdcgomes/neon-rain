@@ -14,6 +14,7 @@ import { ipaSystem } from './systems/ipa.ts';
 import { crowdSystem } from './systems/crowd.ts';
 import { objectiveSystem } from './systems/objectives.ts';
 import { populate } from './setup.ts';
+import { Traffic } from './traffic.ts';
 import { DT } from './time.ts';
 
 export { DT, TICK_HZ } from './time.ts';
@@ -24,6 +25,7 @@ export class World {
   readonly map: CityMap;
   readonly nav: Nav;
   readonly rng: Rng;
+  readonly traffic: Traffic;
   tick = 0;
   time = 0;
   entities: Entity[] = [];
@@ -74,6 +76,7 @@ export class World {
     this.buckets = Array.from({ length: this.gw * this.gh }, () => []);
     populate(this, squad);
     this.rebuildGrid();
+    this.traffic = new Traffic(this, content.mission.population.traffic ?? 0);
   }
 
   step(commands: readonly Command[]): void {
@@ -94,6 +97,7 @@ export class World {
     aiSystem(this);
     crowdSystem(this);
     movementSystem(this);
+    this.traffic.update(this);
     combatSystem(this);
     projectileSystem(this);
     persuadeSystem(this);
@@ -125,6 +129,7 @@ export class World {
       facing: this.rng.range(0, Math.PI * 2),
       radius: 0.32,
       speed: 4.5,
+      pace: 1,
       hp: 50,
       maxHp: 50,
       armor: 0,
@@ -172,6 +177,7 @@ export class World {
       panic: 0,
       warnedAt: 0,
       witnessedAt: -99,
+      carHitAt: -99,
       persuadeProgress: 0,
       persuadeTick: -1,
       persuadedBy: -1,
@@ -279,7 +285,8 @@ export class World {
       if (target.kind === 'agent') return;
     }
     if (target.kind === 'civilian' && target.faction === 'civ') this.panicAt(target, src?.x ?? target.x, src?.y ?? target.y);
-    if ((target.faction === 'enemy' || target.faction === 'police') && src && this.isHostile(src, target)) {
+    if (target.kind === 'target' && src && this.isHostile(src, target)) this.raiseAlarm();
+    if ((target.faction === 'enemy' || target.faction === 'police') && target.kind !== 'target' && src && this.isHostile(src, target)) {
       target.ai = 'combat';
       target.targetId = src.id;
       target.lastSeenX = src.x;
@@ -321,6 +328,7 @@ export class World {
 
   explode(x: number, y: number, r: number, damage: number, sourceId: number): void {
     this.emit({ t: 'explosion', x, y, r });
+    this.traffic?.wreckNear(x, y, r, this.time);
     this.query(x, y, r, (e, d2) => {
       const d = Math.sqrt(d2);
       if (d > 0.8 && !this.nav.los(x, y, e.x, e.y)) return;
@@ -409,6 +417,6 @@ export class World {
       h = (Math.imul(h, 31) + Math.round(e.y * 100)) | 0;
       h = (Math.imul(h, 31) + Math.round(e.hp * 10)) | 0;
     }
-    return h >>> 0;
+    return this.traffic.checksum(h) >>> 0;
   }
 }

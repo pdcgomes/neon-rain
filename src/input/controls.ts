@@ -11,12 +11,15 @@ export interface ControlHooks {
 
 const STEER_INTERVAL = 0.15;
 const PAN_SPEED = 38;
+const ORBIT_SENSITIVITY = 0.0055;
+const KEY_ORBIT_SPEED = 1.9;
 
 /**
  * Cannon Fodder-style scheme:
  *   Left click / hold   move the selected squad (hold to steer)
  *   Right click / hold  fire at the cursor (move and shoot at the same time)
  *   Left + Right        throw a grenade at the cursor
+ *   Middle drag / Alt+Left drag   orbit the camera
  */
 export class Controls {
   readonly selected = new Set<number>();
@@ -31,6 +34,7 @@ export class Controls {
   private chord = false;
   private wasFiring = false;
   private lastSteer = 0;
+  private orbiting = false;
   private keys = new Set<string>();
   private world: World;
   private view: GameRenderer;
@@ -49,20 +53,24 @@ export class Controls {
     canvas.addEventListener('mousedown', (e) => this.onDown(e), { signal });
     window.addEventListener('mouseup', (e) => this.onUp(e), { signal });
     window.addEventListener('mousemove', (e) => {
+      if (this.orbiting) view.rig.orbit(-e.movementX * ORBIT_SENSITIVITY, e.movementY * ORBIT_SENSITIVITY);
       this.mx = e.clientX;
       this.my = e.clientY;
       this.hasMouse = true;
     }, { signal });
+    canvas.addEventListener('auxclick', (e) => e.preventDefault(), { signal });
     canvas.addEventListener('mouseleave', () => (this.hasMouse = false), { signal });
     canvas.addEventListener('mouseenter', () => (this.hasMouse = true), { signal });
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      view.rig.zoom(e.deltaY);
+      if (e.shiftKey) view.rig.orbit(0, -(e.deltaY || e.deltaX) * 0.0015);
+      else view.rig.zoom(e.deltaY);
     }, { passive: false, signal });
     window.addEventListener('keydown', (e) => this.onKey(e, true), { signal });
     window.addEventListener('keyup', (e) => this.onKey(e, false), { signal });
     window.addEventListener('blur', () => {
       this.lmb = this.rmb = false;
+      this.orbiting = false;
       this.keys.clear();
       if (this.overdrive) this.setOverdrive(false);
     }, { signal });
@@ -77,6 +85,11 @@ export class Controls {
   }
 
   private onDown(e: MouseEvent): void {
+    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      e.preventDefault();
+      this.orbiting = true;
+      return;
+    }
     if (!this.enabled) return;
     this.updateCursor();
     if (e.button === 0) this.lmb = true;
@@ -90,6 +103,10 @@ export class Controls {
   }
 
   private onUp(e: MouseEvent): void {
+    if (e.button === 1 || (this.orbiting && e.button === 0)) {
+      this.orbiting = false;
+      return;
+    }
     if (e.button === 0) this.lmb = false;
     if (e.button === 2) this.rmb = false;
     if (!this.lmb && !this.rmb) this.chord = false;
@@ -202,14 +219,11 @@ export class Controls {
         e.preventDefault();
         this.setOverdrive(true);
         break;
-      case 'KeyQ':
-        this.view.rig.rotate(-1);
-        break;
-      case 'KeyE':
-        this.view.rig.rotate(1);
-        break;
       case 'KeyF':
-        this.view.rig.recenter();
+        this.view.rig.resetView();
+        break;
+      case 'KeyY':
+        this.view.rig.toggleTopDown();
         break;
       case 'KeyO':
         this.hooks.onToggleStats();
@@ -235,6 +249,13 @@ export class Controls {
     if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) py += 1;
     if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) py -= 1;
     if (px || py) this.view.rig.panBy(px * PAN_SPEED * dt, py * PAN_SPEED * dt);
+    let orbit = 0;
+    if (this.keys.has('KeyQ')) orbit += 1;
+    if (this.keys.has('KeyE')) orbit -= 1;
+    let tilt = 0;
+    if (this.keys.has('PageUp')) tilt += 1;
+    if (this.keys.has('PageDown')) tilt -= 1;
+    if (orbit || tilt) this.view.rig.orbit(orbit * KEY_ORBIT_SPEED * dt, tilt * KEY_ORBIT_SPEED * 0.5 * dt);
   }
 
   /** Per-sim-tick: continuous orders, then drain the queue. */

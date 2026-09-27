@@ -45,6 +45,7 @@ export interface MissionDef {
     rivals: number;
     guards: number;
     heavies: number;
+    traffic?: number;
   };
   policeHostileAt: number;
   enforcersAt: number;

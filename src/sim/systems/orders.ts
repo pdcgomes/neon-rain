@@ -19,7 +19,7 @@ export function applyCommand(world: World, cmd: Command): void {
     case 'move': {
       const [leader, ...rest] = agents;
       leader.followId = -1;
-      leader.path = world.nav.findPath(leader.x, leader.y, cmd.x, cmd.y, leader.radius);
+      leader.path = world.nav.findPath(leader.x, leader.y, cmd.x, cmd.y, leader.radius, 12000, 0.4);
       leader.pathIdx = 0;
       leader.stuckTicks = 0;
       leader.moveTarget = { x: cmd.x, y: cmd.y };
