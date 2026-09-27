@@ -106,6 +106,33 @@ flowchart LR
 - **`src/audio/`** synthesizes every sound effect and the ambient music loops in code, then plays them through Howler.
 - **`src/content/`** holds the data-driven weapons, agent template, and mission definition. Most balance tuning lives here.
 
+## Style Lab
+
+`/lab.html` (run `npm run dev`, then open http://localhost:5173/lab.html) is a side app for settling the art direction before any assets go into the game. It uses the game's own renderer: the same post-processing, environment lighting and facade shader.
+
+![Style A lineup](assets/lab-lineup-a.jpg)
+![Style C lineup](assets/lab-lineup-c.jpg)
+
+- **Styles:** *Base* is today's in-game primitives. *A · Low-poly* is flat-shaded, faceted shapes. *C · Voxel* is chunky, about 26 voxels tall, with stepped 8 fps motion. *Imported* shows GLB and `.vox` files. Every style renders the same character designs (`src/lab/kits/designs.ts`), so a comparison never changes who is who.
+- **Boards** are grouped in a macOS-style source list: character groups, a lineup against a 1.8 m ruler, buildings, signage, a street slice, props, animation boards, and style comparisons. Search, collapse, and `↑`/`↓` navigate; every view is a deep link.
+- **Viewport:** drag to orbit, right-drag to pan, scroll to zoom; *Front, Side, Top, 3/4* and *Game* (the in-game camera) presets. Click selects, double-click or `F` frames.
+- **Animation:** every character runs on a shared Mixamo-named skeleton with 17 placeholder clips, one per game state (idle, walk, run, aim-walk, strafe, shooting, throw, persuade, hit, two deaths, panic, cower, umbrella walk, persuaded shuffle). The timeline plays, pauses, scrubs, steps frames and changes speed, and the inspector has a crossfade tester. The *Clip Grid*, *Treadmill* (in-game speeds, foot contact markers, root trail) and *Game-scale Motion* (in-game camera at true pixel density) boards are for judging motion.
+- **Review tools:** silhouette mode, pixel preview, turntable, rain and wet floor, skeleton overlay, onion skin, and PNG export.
+
+![Style comparison](assets/lab-compare.jpg)
+
+### Bringing in real models
+
+Put files in `public/lab/assets/` and list them in `public/lab/manifest.json`. You can also drop `.glb`, `.gltf` or `.vox` files straight onto the viewport:
+
+```json
+{ "id": "agent-tripo-01", "name": "Agent (Tripo)", "file": "assets/tripo/agent_01.glb",
+  "category": "character", "kind": "agent", "height": 1.84, "source": "Tripo image-to-3D",
+  "clipAliases": { "Armature|Rifle Run": "run" } }
+```
+
+Models are scaled to `height` and placed on the floor. Clips are mapped onto the catalogue by name: Mixamo names are recognised, and `clipAliases` covers the rest. The inspector lists missing clips. The conventions: +Y up, the character faces +Z, metres, and a Mixamo skeleton (`mixamorig:*`) so every character shares one set of clips.
+
 ## Dev tooling
 
 - `node scripts/sim-smoke.ts` runs the whole mission headless with a scripted squad, then checks that two runs with the same inputs produce identical state.

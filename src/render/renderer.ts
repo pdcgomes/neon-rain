@@ -18,7 +18,7 @@ export interface ViewState {
 
 const FOG = 0x0a0918;
 
-function neonEnvironment(renderer: THREE.WebGLRenderer): THREE.Texture {
+export function neonEnvironment(renderer: THREE.WebGLRenderer): THREE.Texture {
   const scene = new THREE.Scene();
   const sky = new THREE.Mesh(
     new THREE.SphereGeometry(50, 32, 16),

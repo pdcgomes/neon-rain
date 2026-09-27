@@ -46,7 +46,7 @@ float bayer4(vec2 p) {
 }
 `;
 
-function buildingMaterial(uniforms: { uTime: { value: number } }): THREE.MeshStandardMaterial {
+export function buildingMaterial(uniforms: { uTime: { value: number } }): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.62, metalness: 0.15, envMapIntensity: 0.35 });
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = uniforms.uTime;

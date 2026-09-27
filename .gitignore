@@ -6,3 +6,6 @@ shots
 
 # Godot editor cache
 .godot/
+
+# Local secrets
+.env.local

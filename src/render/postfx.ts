@@ -33,8 +33,11 @@ export class PostFX {
   private height = 1;
   private overdrive = 0;
 
-  constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
+  private dynamic: boolean;
+
+  constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, opts: { dynamicResolution?: boolean } = {}) {
     this.renderer = renderer;
+    this.dynamic = opts.dynamicResolution ?? true;
     this.baseDpr = Math.min(window.devicePixelRatio || 1, 2);
     this.composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType });
     this.composer.addPass(new RenderPass(scene, camera));
@@ -67,6 +70,12 @@ export class PostFX {
     this.apply();
   }
 
+  /** Overrides the base device pixel ratio (the lab's pixel-preview mode renders at a fraction of it). */
+  setBasePixelRatio(dpr: number): void {
+    this.baseDpr = dpr;
+    this.apply();
+  }
+
   private apply(): void {
     this.renderer.setPixelRatio(this.baseDpr * this.scale);
     this.renderer.setSize(this.width, this.height, false);
@@ -83,6 +92,7 @@ export class PostFX {
 
   render(dt: number, now: number): void {
     this.composer.render(dt);
+    if (!this.dynamic) return;
     this.frameTimes.push(dt * 1000);
     if (this.frameTimes.length > 90) this.frameTimes.shift();
     if (now - this.lastAdjust < 1.5 || this.frameTimes.length < 60) return;
