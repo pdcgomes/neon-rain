@@ -191,6 +191,7 @@ export async function loadEntry(e: ManifestEntry): Promise<LabAsset> {
   }
   const gltf = await loadModel(url, e.format);
   const scene = SkeletonUtils.clone(gltf.scene);
+  scene.traverse((o) => (o as THREE.SkinnedMesh).isSkinnedMesh && (o as THREE.SkinnedMesh).normalizeSkinWeights());
   const repaired = repairRestPose(scene);
   const placeholders = e.category === 'character' ? retargetProcedural(scene) : [];
   const obj = normalise(scene, e.height, e.category);

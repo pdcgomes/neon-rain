@@ -198,6 +198,66 @@
       "glowColor": "#1ff4ff",
       "source": "Tripo web, text-to-3D + Mixamo rig (9.5k tris)",
       "notes": "Tripo web rig export: skeleton OK but every vertex is weighted 100% to Hips, so the body cannot deform. Superseded by the Mixamo rig."
+    },
+    {
+      "id": "mixamo-agent-01",
+      "name": "Eurocorp Agent \u00b7 Mixamo 01",
+      "file": "assets/mixamo/agent_01/agent_01.fbx",
+      "category": "character",
+      "kind": "agent",
+      "height": 1.84,
+      "glowColor": "#1ff4ff",
+      "format": "fbx",
+      "source": "Tripo web mesh, Mixamo auto-rig + mocap",
+      "clipAliases": {
+        "mixamo.com": "idle"
+      },
+      "extraAnimations": [
+        {
+          "file": "assets/mixamo/agent_01/walk.fbx",
+          "clip": "walk"
+        },
+        {
+          "file": "assets/mixamo/agent_01/run.fbx",
+          "clip": "run"
+        },
+        {
+          "file": "assets/mixamo/agent_01/strafe.fbx",
+          "clip": "strafe"
+        },
+        {
+          "file": "assets/mixamo/agent_01/shoot_smg.fbx",
+          "clip": "shoot_smg"
+        },
+        {
+          "file": "assets/mixamo/agent_01/shoot_pistol.fbx",
+          "clip": "shoot_pistol"
+        },
+        {
+          "file": "assets/mixamo/agent_01/throw.fbx",
+          "clip": "throw"
+        },
+        {
+          "file": "assets/mixamo/agent_01/hit.fbx",
+          "clip": "hit"
+        },
+        {
+          "file": "assets/mixamo/agent_01/death_a.fbx",
+          "clip": "death_a"
+        },
+        {
+          "file": "assets/mixamo/agent_01/death_b.fbx",
+          "clip": "death_b"
+        },
+        {
+          "file": "assets/mixamo/agent_01/cower.fbx",
+          "clip": "cower"
+        },
+        {
+          "file": "assets/mixamo/agent_01/panic_run.fbx",
+          "clip": "panic_run"
+        }
+      ]
     }
   ]
 }
