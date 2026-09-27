@@ -1,0 +1,24 @@
+{
+  "id": "01_downtown",
+  "codename": "NEON RAIN",
+  "city": "Neo-Lisboa // Sector 7",
+  "seed": 7717,
+  "map": { "size": 120, "blockMin": 20, "blockMax": 28, "roadWidth": 8 },
+  "briefing": [
+    "Good evening, Agents. Eurocorp thanks you for your continued ownership.",
+    "Director Hale Voss of Kaiju Dynamics has been negotiating to sell Sector 7's neural-chip contracts to a competitor. This is regrettable, and it will be corrected.",
+    "Voss is holding a public appearance in Sakura Plaza, under the protection of three bodyguards and a rival syndicate detail. Local police are on retainer to nobody. Keep your weapons holstered near patrols unless you want the whole precinct on you.",
+    "Terminate Voss before he reaches his limousine on the eastern boulevard, then reach the extraction VTOL in the north-west. His bodyguards are well trained and would make fine Eurocorp assets. Persuade them if you can.",
+    "Civilian casualties will be deducted from your maintenance budget."
+  ],
+  "targetName": "Director Hale Voss",
+  "targetCorp": "Kaiju Dynamics",
+  "objectives": [
+    { "id": "kill", "text": "Eliminate Director Hale Voss" },
+    { "id": "extract", "text": "Reach the extraction VTOL" }
+  ],
+  "bonus": { "id": "persuade_guards", "text": "Persuade Voss's bodyguards" },
+  "population": { "civilians": 110, "police": 8, "rivals": 6, "guards": 3, "heavies": 1 },
+  "policeHostileAt": 40,
+  "enforcersAt": 70
+}

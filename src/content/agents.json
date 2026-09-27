@@ -1,0 +1,14 @@
+{
+  "template": {
+    "hp": 100,
+    "speed": 5.2,
+    "loadout": ["pistol", "uzi", "minigun", "persuadertron"],
+    "grenades": 2
+  },
+  "recruitNames": [
+    "Kade", "Ivo", "Rhee", "Mara", "Solis", "Dacha", "Nyx", "Brann", "Oskar", "Yuki",
+    "Teo", "Vesna", "Rook", "Anya", "Juno", "Cass", "Mikael", "Lira", "Dex", "Hana",
+    "Pax", "Soren", "Tamsin", "Odile", "Quill", "Renzo", "Sable", "Wren", "Zed", "Imre",
+    "Bex", "Coil", "Farrow", "Gale", "Hollis", "Ines", "Jarek", "Kira", "Lux", "Moss"
+  ]
+}

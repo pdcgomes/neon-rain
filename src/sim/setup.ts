@@ -1,0 +1,158 @@
+import type { AgentDef } from './content.ts';
+import { GROUND_ALLEY, GROUND_PLAZA, GROUND_SIDEWALK } from './map.ts';
+import type { Entity, Vec2 } from './types.ts';
+import type { World } from './world.ts';
+
+const CIV_NAMES = ['Citizen'];
+
+export function randomPedestrianSpot(world: World, avoid: Vec2 | null, minDist: number): Vec2 {
+  const { map, nav, rng } = world;
+  for (let tries = 0; tries < 400; tries++) {
+    const x = rng.int(2, map.w - 3);
+    const y = rng.int(2, map.h - 3);
+    const g = map.ground[y * map.w + x];
+    if (g !== GROUND_SIDEWALK && g !== GROUND_PLAZA && g !== GROUND_ALLEY) continue;
+    if (nav.isBlocked(x, y)) continue;
+    if (avoid && Math.hypot(x - avoid.x, y - avoid.y) < minDist) continue;
+    return { x: x + 0.5, y: y + 0.5 };
+  }
+  return nav.nearestWalkable(map.w / 2, map.h / 2);
+}
+
+export function spawnCivilian(world: World, at: Vec2): Entity {
+  const e = world.spawn('civilian', 'civ', at.x, at.y, world.rng.pick(CIV_NAMES));
+  e.hp = e.maxHp = 25;
+  e.speed = world.rng.range(4.2, 4.8);
+  e.ai = 'wander';
+  e.flowIdx = world.rng.pick(world.flowWander);
+  return e;
+}
+
+export function spawnPolice(world: World, at: Vec2, tier: 1 | 2): Entity {
+  const e = world.spawn(tier === 1 ? 'police' : 'enforcer', 'police', at.x, at.y, tier === 1 ? 'Officer' : 'Enforcer');
+  if (tier === 1) {
+    e.hp = e.maxHp = 60;
+    e.speed = 4.4;
+    e.weapons = ['enemyPistol'];
+  } else {
+    e.hp = e.maxHp = 110;
+    e.armor = 0.3;
+    e.speed = 4.8;
+    e.weapons = ['riotGun'];
+  }
+  e.holstered = tier === 1;
+  e.ai = tier === 1 ? 'patrol' : 'combat';
+  e.flowIdx = world.rng.pick(world.flowWander);
+  return e;
+}
+
+export function spawnRival(world: World, at: Vec2, heavy = false): Entity {
+  const e = world.spawn('rival', 'enemy', at.x, at.y, heavy ? 'Heavy' : 'Rival Agent');
+  e.hp = e.maxHp = heavy ? 150 : 95;
+  e.armor = heavy ? 0.25 : 0.1;
+  e.speed = heavy ? 4.2 : 5.0;
+  e.weapons = [heavy ? 'enemyGauss' : 'enemyUzi'];
+  e.ammo = heavy ? 99 : 0;
+  e.holstered = false;
+  e.ai = 'patrol';
+  return e;
+}
+
+export function populate(world: World, squad: AgentDef[]): void {
+  const { map, nav, rng, content } = world;
+  const mission = content.mission;
+
+  for (const p of map.intersections) world.flowWander.push(nav.addFlowTarget(p));
+  for (const p of map.exits) world.flowExits.push(nav.addFlowTarget(p));
+
+  // Squad.
+  const offsets = [
+    [-0.8, -0.8],
+    [0.8, -0.8],
+    [-0.8, 0.8],
+    [0.8, 0.8],
+  ];
+  squad.slice(0, 4).forEach((def, i) => {
+    const e = world.spawn('agent', 'player', map.spawn.x + offsets[i][0], map.spawn.y + offsets[i][1], def.name);
+    e.hp = e.maxHp = def.hp;
+    e.speed = def.speed;
+    e.radius = 0.34;
+    e.armor = 0.35;
+    e.weapons = [...def.loadout];
+    e.grenades = def.grenades;
+    e.slot = i;
+    e.facing = -Math.PI / 4;
+    e.holstered = true;
+    world.agentIds.push(e.id);
+  });
+  const leader = world.get(world.agentIds[0]);
+  world.agents().forEach((a, i) => {
+    if (i > 0 && leader) {
+      a.followId = leader.id;
+      a.followRank = i;
+    }
+  });
+
+  // Target and bodyguards in the plaza.
+  const pz = map.plaza;
+  const pc = { x: pz.x + pz.w / 2, y: pz.y + pz.h / 2 };
+  const target = world.spawn('target', 'enemy', pc.x + 2.6, pc.y + 0.5, mission.targetName);
+  target.hp = target.maxHp = 70;
+  target.speed = 3.4;
+  target.ai = 'idle';
+  target.post = { x: target.x, y: target.y };
+  world.targetId = target.id;
+
+  for (let i = 0; i < mission.population.guards; i++) {
+    const a = (i / mission.population.guards) * Math.PI * 2 + 0.4;
+    const g = world.spawn('guard', 'enemy', target.x + Math.cos(a) * 2.2, target.y + Math.sin(a) * 2.2, 'Bodyguard');
+    g.hp = g.maxHp = 90;
+    g.armor = 0.15;
+    g.speed = 5.0;
+    g.weapons = ['enemyUzi'];
+    g.holstered = false;
+    g.ai = 'guard';
+    g.post = { x: g.x, y: g.y };
+    g.facing = a;
+  }
+
+  // Rival syndicate patrols: pairs looping between intersections around the plaza.
+  const byDist = [...map.intersections].sort(
+    (a, b) => Math.hypot(a.x - pc.x, a.y - pc.y) - Math.hypot(b.x - pc.x, b.y - pc.y),
+  );
+  const ring = byDist.slice(0, Math.min(6, byDist.length));
+  for (let i = 0; i < mission.population.rivals; i += 2) {
+    const start = ring[(i / 2) % ring.length];
+    const route = [start, ring[(i / 2 + 1) % ring.length], ring[(i / 2 + 3) % ring.length]].map((p) => ({ ...p }));
+    const lead = spawnRival(world, start);
+    lead.patrol = route;
+    lead.patrolIdx = 1;
+    if (i + 1 < mission.population.rivals) {
+      const mate = spawnRival(world, { x: start.x + 1, y: start.y + 1 });
+      mate.patrol = route;
+      mate.patrolIdx = 1;
+      mate.followId = lead.id;
+      mate.followRank = 1;
+    }
+  }
+  for (let i = 0; i < mission.population.heavies; i++) {
+    const spot = nav.nearestWalkable(pz.x + pz.w + 1, pc.y);
+    const h = spawnRival(world, spot, true);
+    h.ai = 'guard';
+    h.post = { ...spot };
+  }
+
+  // Police patrols.
+  for (let i = 0; i < mission.population.police; i++) {
+    spawnPolice(world, randomPedestrianSpot(world, map.spawn, 20), 1);
+  }
+
+  // Civilians.
+  world.civTarget = mission.population.civilians;
+  for (let i = 0; i < mission.population.civilians; i++) {
+    const c = spawnCivilian(world, randomPedestrianSpot(world, map.spawn, 6));
+    c.facing = rng.range(0, Math.PI * 2);
+  }
+
+  world.nextEnforcerAt = 0;
+}
