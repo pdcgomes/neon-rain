@@ -6,6 +6,7 @@ import { canonicalClipName, CLIP_IDS } from '../anim/catalogue.ts';
 import { repairRestPose, retargetProcedural } from '../anim/retarget.ts';
 import { meshVoxels } from '../voxel/mesher.ts';
 import { parseVox } from '../voxel/vox.ts';
+import { attachToHand, type AttachSpec } from './attach.ts';
 import { baselineKit } from './baseline.ts';
 import { CHARACTER_LABELS, PROP_LABELS, type AssetCategory, type CharacterKind, type LabAsset, type PropKind, type StyleKit } from './types.ts';
 
@@ -30,6 +31,8 @@ export interface ManifestEntry {
   format?: 'glb' | 'fbx' | 'vox';
   /** Extra GLB/FBX files whose first animation plays on this model (e.g. Mixamo downloads, "without skin"). */
   extraAnimations?: { file: string; clip: string }[];
+  /** Other manifest assets held by this character (weapons). */
+  attach?: AttachSpec[];
 }
 
 export interface Manifest {
@@ -227,8 +230,14 @@ export async function loadEntry(e: ManifestEntry): Promise<LabAsset> {
       filled.push(c.name);
     }
   }
+  const held: string[] = [];
+  for (const a of e.attach ?? []) {
+    const src = importedEntries().find((x) => x.id === a.asset);
+    if (src && attachToHand(obj, (await loadEntry(src)).object, clips, a)) held.push(src.name);
+  }
   const notes = [
     e.notes,
+    held.length ? `Holding ${held.join(', ')}` : '',
     repaired ? 'Rest pose rebuilt from bind matrices' : '',
     filled.length ? `${filled.length} placeholder clips retargeted (${filled.length === CLIP_IDS.length ? 'all' : filled.join(', ')})` : '',
     unmapped.length ? `Unmapped clips: ${unmapped.join(', ')}` : ''].filter(Boolean).join(' · ');
