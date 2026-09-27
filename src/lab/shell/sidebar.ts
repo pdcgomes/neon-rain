@@ -74,7 +74,7 @@ export class Sidebar {
       sec.appendChild(head);
       const list = document.createElement('div');
       list.className = 'nav-items';
-      if (!boards.length) list.innerHTML = `<div class="nav-empty">${s === 'Imported' ? 'Drop .glb or .vox files' : 'Empty'}</div>`;
+      if (!boards.length) list.innerHTML = `<div class="nav-empty">${s === 'Imported' ? 'Drop .glb, .fbx or .vox files' : 'Empty'}</div>`;
       for (const b of boards) {
         const item = document.createElement('div');
         item.className = `nav-item${b.id === this.current ? ' selected' : ''}`;

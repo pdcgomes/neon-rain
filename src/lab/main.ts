@@ -363,7 +363,7 @@ viewportEl.addEventListener('drop', (e) => {
   viewportEl.classList.remove('dragging');
   let last = '';
   for (const f of Array.from(e.dataTransfer?.files ?? [])) {
-    if (!/\.(glb|gltf|vox)$/i.test(f.name)) continue;
+    if (!/\.(glb|gltf|fbx|vox)$/i.test(f.name)) continue;
     const entry = addDropped(f);
     const b = importedBoard(entry);
     registry.add(b);

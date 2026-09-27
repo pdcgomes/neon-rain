@@ -2,139 +2,139 @@
   "assets": [
     {
       "id": "agent_0_a",
-      "name": "Kade · A",
+      "name": "Kade \u00b7 A",
       "file": "assets/generated/agent_0_a.glb",
       "category": "character",
       "kind": "agent",
-      "source": "Style A kit → skinned GLB (873 tris, 17 clips)",
+      "source": "Style A kit \u2192 skinned GLB (873 tris, 17 clips)",
       "height": 1.84,
       "notes": "Mixamo-named skeleton, rigid skinning"
     },
     {
       "id": "agent_3_a",
-      "name": "Mara · A",
+      "name": "Mara \u00b7 A",
       "file": "assets/generated/agent_3_a.glb",
       "category": "character",
       "kind": "agent",
-      "source": "Style A kit → skinned GLB (836 tris, 17 clips)",
+      "source": "Style A kit \u2192 skinned GLB (836 tris, 17 clips)",
       "height": 1.76,
       "notes": "Mixamo-named skeleton, rigid skinning"
     },
     {
       "id": "rival_0_a",
-      "name": "Rival Agent · A",
+      "name": "Rival Agent \u00b7 A",
       "file": "assets/generated/rival_0_a.glb",
       "category": "character",
       "kind": "rival",
-      "source": "Style A kit → skinned GLB (813 tris, 17 clips)",
+      "source": "Style A kit \u2192 skinned GLB (813 tris, 17 clips)",
       "height": 1.83,
       "notes": "Mixamo-named skeleton, rigid skinning"
     },
     {
       "id": "police_0_a",
-      "name": "Police Officer · A",
+      "name": "Police Officer \u00b7 A",
       "file": "assets/generated/police_0_a.glb",
       "category": "character",
       "kind": "police",
-      "source": "Style A kit → skinned GLB (757 tris, 17 clips)",
+      "source": "Style A kit \u2192 skinned GLB (757 tris, 17 clips)",
       "height": 1.82,
       "notes": "Mixamo-named skeleton, rigid skinning"
     },
     {
       "id": "civilian_1_a",
-      "name": "Courier · A",
+      "name": "Courier \u00b7 A",
       "file": "assets/generated/civilian_1_a.glb",
       "category": "character",
       "kind": "civilian",
-      "source": "Style A kit → skinned GLB (891 tris, 17 clips)",
+      "source": "Style A kit \u2192 skinned GLB (891 tris, 17 clips)",
       "height": 1.7200000000000002,
       "notes": "Mixamo-named skeleton, rigid skinning"
     },
     {
       "id": "agent_0_c",
-      "name": "Kade · C",
+      "name": "Kade \u00b7 C",
       "file": "assets/generated/agent_0_c.glb",
       "category": "character",
       "kind": "agent",
-      "source": "Style C kit → skinned GLB (416 tris, 17 clips)",
+      "source": "Style C kit \u2192 skinned GLB (416 tris, 17 clips)",
       "height": 1.84,
-      "notes": "Mixamo-named skeleton, rigid skinning · MagicaVoxel source: agent_0_c.vox"
+      "notes": "Mixamo-named skeleton, rigid skinning \u00b7 MagicaVoxel source: agent_0_c.vox"
     },
     {
       "id": "agent_3_c",
-      "name": "Mara · C",
+      "name": "Mara \u00b7 C",
       "file": "assets/generated/agent_3_c.glb",
       "category": "character",
       "kind": "agent",
-      "source": "Style C kit → skinned GLB (428 tris, 17 clips)",
+      "source": "Style C kit \u2192 skinned GLB (428 tris, 17 clips)",
       "height": 1.76,
-      "notes": "Mixamo-named skeleton, rigid skinning · MagicaVoxel source: agent_3_c.vox"
+      "notes": "Mixamo-named skeleton, rigid skinning \u00b7 MagicaVoxel source: agent_3_c.vox"
     },
     {
       "id": "rival_0_c",
-      "name": "Rival Agent · C",
+      "name": "Rival Agent \u00b7 C",
       "file": "assets/generated/rival_0_c.glb",
       "category": "character",
       "kind": "rival",
-      "source": "Style C kit → skinned GLB (420 tris, 17 clips)",
+      "source": "Style C kit \u2192 skinned GLB (420 tris, 17 clips)",
       "height": 1.83,
-      "notes": "Mixamo-named skeleton, rigid skinning · MagicaVoxel source: rival_0_c.vox"
+      "notes": "Mixamo-named skeleton, rigid skinning \u00b7 MagicaVoxel source: rival_0_c.vox"
     },
     {
       "id": "police_0_c",
-      "name": "Police Officer · C",
+      "name": "Police Officer \u00b7 C",
       "file": "assets/generated/police_0_c.glb",
       "category": "character",
       "kind": "police",
-      "source": "Style C kit → skinned GLB (316 tris, 17 clips)",
+      "source": "Style C kit \u2192 skinned GLB (316 tris, 17 clips)",
       "height": 1.82,
-      "notes": "Mixamo-named skeleton, rigid skinning · MagicaVoxel source: police_0_c.vox"
+      "notes": "Mixamo-named skeleton, rigid skinning \u00b7 MagicaVoxel source: police_0_c.vox"
     },
     {
       "id": "civilian_1_c",
-      "name": "Courier · C",
+      "name": "Courier \u00b7 C",
       "file": "assets/generated/civilian_1_c.glb",
       "category": "character",
       "kind": "civilian",
-      "source": "Style C kit → skinned GLB (658 tris, 17 clips)",
+      "source": "Style C kit \u2192 skinned GLB (658 tris, 17 clips)",
       "height": 1.7200000000000002,
-      "notes": "Mixamo-named skeleton, rigid skinning · MagicaVoxel source: civilian_1_c.vox"
+      "notes": "Mixamo-named skeleton, rigid skinning \u00b7 MagicaVoxel source: civilian_1_c.vox"
     },
     {
       "id": "prop_car_a",
-      "name": "Car · A",
+      "name": "Car \u00b7 A",
       "file": "assets/generated/prop_car_a.glb",
       "category": "prop",
       "prop": "car",
-      "source": "Style A kit → GLB (212 tris)"
+      "source": "Style A kit \u2192 GLB (212 tris)"
     },
     {
       "id": "prop_vtol_a",
-      "name": "Extraction VTOL · A",
+      "name": "Extraction VTOL \u00b7 A",
       "file": "assets/generated/prop_vtol_a.glb",
       "category": "prop",
       "prop": "vtol",
-      "source": "Style A kit → GLB (508 tris)"
+      "source": "Style A kit \u2192 GLB (508 tris)"
     },
     {
       "id": "prop_car_c",
-      "name": "Car · C",
+      "name": "Car \u00b7 C",
       "file": "assets/generated/prop_car_c.glb",
       "category": "prop",
       "prop": "car",
-      "source": "Style C kit → GLB (140 tris)"
+      "source": "Style C kit \u2192 GLB (140 tris)"
     },
     {
       "id": "prop_vtol_c",
-      "name": "Extraction VTOL · C",
+      "name": "Extraction VTOL \u00b7 C",
       "file": "assets/generated/prop_vtol_c.glb",
       "category": "prop",
       "prop": "vtol",
-      "source": "Style C kit → GLB (420 tris)"
+      "source": "Style C kit \u2192 GLB (420 tris)"
     },
     {
       "id": "agent_0_c_vox",
-      "name": "Kade · C (.vox)",
+      "name": "Kade \u00b7 C (.vox)",
       "file": "assets/generated/agent_0_c.vox",
       "category": "character",
       "format": "vox",
@@ -143,7 +143,7 @@
     },
     {
       "id": "agent_3_c_vox",
-      "name": "Mara · C (.vox)",
+      "name": "Mara \u00b7 C (.vox)",
       "file": "assets/generated/agent_3_c.vox",
       "category": "character",
       "format": "vox",
@@ -152,7 +152,7 @@
     },
     {
       "id": "rival_0_c_vox",
-      "name": "Rival Agent · C (.vox)",
+      "name": "Rival Agent \u00b7 C (.vox)",
       "file": "assets/generated/rival_0_c.vox",
       "category": "character",
       "format": "vox",
@@ -161,7 +161,7 @@
     },
     {
       "id": "police_0_c_vox",
-      "name": "Police Officer · C (.vox)",
+      "name": "Police Officer \u00b7 C (.vox)",
       "file": "assets/generated/police_0_c.vox",
       "category": "character",
       "format": "vox",
@@ -170,7 +170,7 @@
     },
     {
       "id": "civilian_1_c_vox",
-      "name": "Courier · C (.vox)",
+      "name": "Courier \u00b7 C (.vox)",
       "file": "assets/generated/civilian_1_c.vox",
       "category": "character",
       "format": "vox",
@@ -179,7 +179,7 @@
     },
     {
       "id": "tripo-agent-01",
-      "name": "Eurocorp Agent · Tripo 01",
+      "name": "Eurocorp Agent \u00b7 Tripo 01",
       "file": "assets/tripo/agent_01.glb",
       "category": "character",
       "kind": "agent",
@@ -187,6 +187,17 @@
       "glowColor": "#1ff4ff",
       "source": "Tripo web, text-to-3D (9.5k tris, PBR textures)",
       "notes": "Static mesh: not rigged yet"
+    },
+    {
+      "id": "tripo-agent-01-rigged",
+      "name": "Eurocorp Agent \u00b7 Tripo 01 (rigged)",
+      "file": "assets/tripo/agent_01_rigged.glb",
+      "category": "character",
+      "kind": "agent",
+      "height": 1.84,
+      "glowColor": "#1ff4ff",
+      "source": "Tripo web, text-to-3D + Mixamo rig (9.5k tris)",
+      "notes": "Tripo web rig export: skeleton OK but every vertex is weighted 100% to Hips, so the body cannot deform. Superseded by the Mixamo rig."
     }
   ]
 }

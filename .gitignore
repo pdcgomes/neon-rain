@@ -12,3 +12,4 @@ shots
 
 # Tripo task log (resume state)
 tools/art/tripo-log.json
+public/lab/assets/tripo/*_mixamo.zip

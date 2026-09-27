@@ -63,7 +63,7 @@ export const importedOverview: BoardDef = {
       bounds: boundsOf(items),
       animated: true,
       turntable: true,
-      subtitle: entries.length ? `${entries.length} imported assets` : 'Nothing imported yet: add entries to public/lab/manifest.json or drop .glb / .vox files here',
+      subtitle: entries.length ? `${entries.length} imported assets` : 'Nothing imported yet: add entries to public/lab/manifest.json or drop .glb / .fbx / .vox files here',
     };
   },
 };

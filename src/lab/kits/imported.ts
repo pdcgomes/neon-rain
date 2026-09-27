@@ -1,7 +1,9 @@
 import * as THREE from 'three';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { canonicalClipName } from '../anim/catalogue.ts';
+import { canonicalClipName, CLIP_IDS } from '../anim/catalogue.ts';
+import { repairRestPose, retargetProcedural } from '../anim/retarget.ts';
 import { meshVoxels } from '../voxel/mesher.ts';
 import { parseVox } from '../voxel/vox.ts';
 import { baselineKit } from './baseline.ts';
@@ -25,8 +27,8 @@ export interface ManifestEntry {
   /** Make texture regions close to this colour glow (for generated models exported without emissive maps). */
   glowColor?: string;
   notes?: string;
-  format?: 'glb' | 'vox';
-  /** Extra GLBs whose animations play on this model (e.g. one file per Tripo retarget). */
+  format?: 'glb' | 'fbx' | 'vox';
+  /** Extra GLB/FBX files whose first animation plays on this model (e.g. Mixamo downloads, "without skin"). */
   extraAnimations?: { file: string; clip: string }[];
 }
 
@@ -34,8 +36,26 @@ export interface Manifest {
   assets: ManifestEntry[];
 }
 
-const loader = new GLTFLoader();
-const cache = new Map<string, Promise<GLTF>>();
+interface Loaded {
+  scene: THREE.Object3D;
+  animations: THREE.AnimationClip[];
+}
+
+const gltfLoader = new GLTFLoader();
+const fbxLoader = new FBXLoader();
+const cache = new Map<string, Promise<Loaded>>();
+
+function loadModel(url: string, format?: ManifestEntry['format']): Promise<Loaded> {
+  let p = cache.get(url);
+  if (!p) {
+    p =
+      format === 'fbx' || url.toLowerCase().endsWith('.fbx')
+        ? fbxLoader.loadAsync(url).then((g) => ({ scene: g, animations: g.animations }))
+        : gltfLoader.loadAsync(url).then((g) => ({ scene: g.scene, animations: g.animations }));
+    cache.set(url, p);
+  }
+  return p;
+}
 let manifest: Manifest = { assets: [] };
 const dropped: ManifestEntry[] = [];
 
@@ -55,7 +75,7 @@ export function importedEntries(): ManifestEntry[] {
 
 export function addDropped(file: File): ManifestEntry {
   const url = URL.createObjectURL(file);
-  const isVox = file.name.toLowerCase().endsWith('.vox');
+  const ext = file.name.toLowerCase().split('.').pop();
   const base = file.name.replace(/\.[^.]+$/, '');
   const entry: ManifestEntry = {
     id: `drop-${dropped.length}-${base}`,
@@ -63,7 +83,7 @@ export function addDropped(file: File): ManifestEntry {
     file: url,
     category: 'character',
     source: `Dropped file (${file.name})`,
-    format: isVox ? 'vox' : 'glb',
+    format: ext === 'vox' ? 'vox' : ext === 'fbx' ? 'fbx' : 'glb',
   };
   dropped.push(entry);
   return entry;
@@ -169,13 +189,10 @@ export async function loadEntry(e: ManifestEntry): Promise<LabAsset> {
     const obj = normalise(meshVoxels(grid, palette, 0.1, [grid.nx / 2, 0, grid.nz / 2]), e.height, e.category);
     return { object: obj, clips: [], name: e.name, category: e.category, source: e.source ?? 'MagicaVoxel .vox', notes: e.notes };
   }
-  let p = cache.get(url);
-  if (!p) {
-    p = loader.loadAsync(url);
-    cache.set(url, p);
-  }
-  const gltf = await p;
+  const gltf = await loadModel(url, e.format);
   const scene = SkeletonUtils.clone(gltf.scene);
+  const repaired = repairRestPose(scene);
+  const placeholders = e.category === 'character' ? retargetProcedural(scene) : [];
   const obj = normalise(scene, e.height, e.category);
   if (e.accent) applyAccent(obj, e.accent);
   if (e.glowColor) applyGlowKey(obj, e.glowColor);
@@ -191,7 +208,7 @@ export async function loadEntry(e: ManifestEntry): Promise<LabAsset> {
   }
   for (const x of e.extraAnimations ?? []) {
     try {
-      const g = await loader.loadAsync(resolveUrl(x.file));
+      const g = await loadModel(resolveUrl(x.file));
       const c = g.animations[0]?.clone();
       if (c && !clips.some((k) => k.name === x.clip)) {
         c.name = x.clip;
@@ -201,7 +218,19 @@ export async function loadEntry(e: ManifestEntry): Promise<LabAsset> {
       unmapped.push(`${x.file} (failed to load)`);
     }
   }
-  const notes = [e.notes, unmapped.length ? `Unmapped clips: ${unmapped.join(', ')}` : ''].filter(Boolean).join(' · ');
+  // Fill catalogue gaps with the lab's placeholder clips, retargeted onto this skeleton.
+  const filled: string[] = [];
+  for (const c of placeholders) {
+    if (CLIP_IDS.includes(c.name) && !clips.some((k) => k.name === c.name)) {
+      clips.push(c);
+      filled.push(c.name);
+    }
+  }
+  const notes = [
+    e.notes,
+    repaired ? 'Rest pose rebuilt from bind matrices' : '',
+    filled.length ? `${filled.length} placeholder clips retargeted (${filled.length === CLIP_IDS.length ? 'all' : filled.join(', ')})` : '',
+    unmapped.length ? `Unmapped clips: ${unmapped.join(', ')}` : ''].filter(Boolean).join(' · ');
   return { object: obj, clips, name: e.name, category: e.category, source: e.source ?? url, notes };
 }
 
