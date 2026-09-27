@@ -176,6 +176,17 @@
       "format": "vox",
       "source": "MagicaVoxel .vox (merged rest pose, editable)",
       "height": 1.7200000000000002
+    },
+    {
+      "id": "tripo-agent-01",
+      "name": "Eurocorp Agent · Tripo 01",
+      "file": "assets/tripo/agent_01.glb",
+      "category": "character",
+      "kind": "agent",
+      "height": 1.84,
+      "glowColor": "#1ff4ff",
+      "source": "Tripo web, text-to-3D (9.5k tris, PBR textures)",
+      "notes": "Static mesh: not rigged yet"
     }
   ]
 }

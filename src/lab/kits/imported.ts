@@ -22,6 +22,8 @@ export interface ManifestEntry {
   clipAliases?: Record<string, string>;
   /** Recolour emissive materials to a faction accent. */
   accent?: string;
+  /** Make texture regions close to this colour glow (for generated models exported without emissive maps). */
+  glowColor?: string;
   notes?: string;
   format?: 'glb' | 'vox';
   /** Extra GLBs whose animations play on this model (e.g. one file per Tripo retarget). */
@@ -113,6 +115,52 @@ function applyAccent(obj: THREE.Object3D, accent: string): void {
   });
 }
 
+/** Builds an emissive map from the pixels of the base colour texture that match `hex` in hue. */
+function applyGlowKey(obj: THREE.Object3D, hex: string): void {
+  const key = new THREE.Color(hex);
+  const keyHsl = { h: 0, s: 0, l: 0 };
+  key.getHSL(keyHsl);
+  const done = new Map<THREE.Texture, THREE.Texture>();
+  obj.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    for (const mt of Array.isArray(m.material) ? m.material : [m.material]) {
+      const s = mt as THREE.MeshStandardMaterial;
+      const img = s.map?.image as CanvasImageSource & { width: number; height: number } | undefined;
+      if (!s.map || !img?.width) continue;
+      let em = done.get(s.map);
+      if (!em) {
+        const c = document.createElement('canvas');
+        c.width = img.width;
+        c.height = img.height;
+        const g = c.getContext('2d', { willReadFrequently: true })!;
+        g.drawImage(img, 0, 0);
+        const data = g.getImageData(0, 0, c.width, c.height);
+        const px = data.data;
+        const col = new THREE.Color();
+        const hsl = { h: 0, s: 0, l: 0 };
+        for (let i = 0; i < px.length; i += 4) {
+          col.setRGB(px[i] / 255, px[i + 1] / 255, px[i + 2] / 255);
+          col.getHSL(hsl);
+          const dh = Math.min(Math.abs(hsl.h - keyHsl.h), 1 - Math.abs(hsl.h - keyHsl.h));
+          const on = dh < 0.06 && hsl.s > 0.45 && hsl.l > 0.28;
+          if (!on) px[i] = px[i + 1] = px[i + 2] = 0;
+        }
+        g.putImageData(data, 0, 0);
+        em = new THREE.CanvasTexture(c);
+        em.colorSpace = THREE.SRGBColorSpace;
+        em.flipY = s.map.flipY;
+        em.channel = s.map.channel;
+        done.set(s.map, em);
+      }
+      s.emissiveMap = em;
+      s.emissive.set('#ffffff');
+      s.emissiveIntensity = 2.6;
+      s.needsUpdate = true;
+    }
+  });
+}
+
 export async function loadEntry(e: ManifestEntry): Promise<LabAsset> {
   const url = resolveUrl(e.file);
   if (e.format === 'vox' || url.toLowerCase().endsWith('.vox')) {
@@ -130,6 +178,7 @@ export async function loadEntry(e: ManifestEntry): Promise<LabAsset> {
   const scene = SkeletonUtils.clone(gltf.scene);
   const obj = normalise(scene, e.height, e.category);
   if (e.accent) applyAccent(obj, e.accent);
+  if (e.glowColor) applyGlowKey(obj, e.glowColor);
   const clips: THREE.AnimationClip[] = [];
   const unmapped: string[] = [];
   for (const clip of gltf.animations) {

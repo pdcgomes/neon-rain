@@ -146,7 +146,7 @@ export class Stage {
     const wet = this.wet && this.preset !== 'studio';
     // The neon environment has very bright panels; at grazing angles a glossy floor mirrors
     // them as huge blobs, so the floor only takes a fraction of it.
-    this.floorMat.roughness = wet ? 0.3 : 0.92;
+    this.floorMat.roughness = wet ? 0.45 : 0.92;
     this.floorMat.metalness = wet ? 0.2 : 0.02;
     this.floorMat.envMapIntensity = wet ? 0.12 : 0.05;
   }
@@ -182,8 +182,8 @@ export class Stage {
     sc.far = 300;
     sc.updateProjectionMatrix();
     // Steep elevation keeps their mirror reflection on the floor out of normal camera angles.
-    this.accents[0].position.set(c.x - 15, 45, c.z - 12);
-    this.accents[1].position.set(c.x + 15, 45, c.z - 12);
+    this.accents[0].position.set(c.x - 6, 45, c.z - 6);
+    this.accents[1].position.set(c.x + 6, 45, c.z - 6);
     for (const l of this.accents) l.target.position.copy(c);
   }
 
