@@ -261,13 +261,7 @@
       "attach": [
         {
           "asset": "tripo-smg-01",
-          "bone": "RightHand",
-          "length": 0.55,
-          "muzzle": "-x",
-          "grip": [
-            0.25,
-            0.3
-          ]
+          "bone": "RightHand"
         }
       ]
     },
@@ -277,7 +271,68 @@
       "file": "assets/tripo/smg_01.glb",
       "category": "prop",
       "glowColor": "#1ff4ff",
-      "source": "Tripo web, text-to-3D (2.7k tris)"
+      "source": "Tripo web, text-to-3D (2.7k tris)",
+      "hold": {
+        "length": 0.55,
+        "muzzle": "-x",
+        "grip": [
+          0.25,
+          0.3
+        ],
+        "aimClip": "shoot_smg"
+      }
+    },
+    {
+      "id": "tripo-pistol-01",
+      "name": "Pistol \u00b7 Tripo 01",
+      "file": "assets/tripo/pistol.glb",
+      "category": "prop",
+      "glowColor": "#1ff4ff",
+      "source": "Tripo web, text-to-3D (2.8k tris)",
+      "hold": {
+        "length": 0.22,
+        "muzzle": "+x",
+        "grip": [
+          0.2,
+          0.3
+        ],
+        "aimClip": "shoot_pistol",
+        "aim": "forearm"
+      }
+    },
+    {
+      "id": "tripo-shotgun-01",
+      "name": "Shotgun \u00b7 Tripo 01",
+      "file": "assets/tripo/shotgun.glb",
+      "category": "prop",
+      "glowColor": "#1ff4ff",
+      "source": "Tripo web, text-to-3D (2.8k tris)",
+      "hold": {
+        "length": 0.95,
+        "muzzle": "-x",
+        "grip": [
+          0.2,
+          0.3
+        ],
+        "aimClip": "shoot_smg"
+      }
+    },
+    {
+      "id": "tripo-minigun-01",
+      "name": "Minigun \u00b7 Tripo 01",
+      "file": "assets/tripo/minigun.glb",
+      "category": "prop",
+      "glowColor": "#1ff4ff",
+      "source": "Tripo web, image-to-3D from concept (2.2k tris)",
+      "hold": {
+        "length": 0.9,
+        "muzzle": "-x",
+        "grip": [
+          0.1,
+          0.3
+        ],
+        "aimClip": "shoot_smg"
+      }
     }
   ]
 }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CATALOGUE } from '../anim/catalogue.ts';
 import { design, LINEUP } from '../kits/designs.ts';
+import { importedEntries, weaponEntries } from '../kits/imported.ts';
 import { countTriangles } from '../kits/geo.ts';
 import type { StyleKit } from '../kits/types.ts';
 import type { LabState } from '../state.ts';
@@ -102,6 +103,11 @@ export class Inspector {
         </div>
         <div class="row"><span class="note">Blend</span><input class="num" type="number" step="0.05" min="0.05" max="2" value="${state.cfblend}" data-k="cfblend" style="width:64px"/><span class="note">s</span></div>
       </div>`
+          : ''
+      }
+      ${
+        importedEntries().some((e) => `imp-${e.id}` === boardId && e.category === 'character' && e.format !== 'vox')
+          ? `<div class="ins-sec"><div class="ins-h">HELD WEAPON</div><select data-k="weapon" style="width:100%">${opt('', state.weapon, 'Manifest default')}${opt('none', state.weapon, 'None')}${weaponEntries().map((w) => opt(w.id, state.weapon, w.name)).join('')}</select><div class="note" style="margin-top:6px">Grip and aim come from the weapon's hold settings in the manifest.</div></div>`
           : ''
       }
       ${

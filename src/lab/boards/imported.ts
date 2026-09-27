@@ -12,7 +12,7 @@ export function importedBoard(e: ManifestEntry): BoardDef {
     styled: false,
     async build(ctx) {
       const g = new THREE.Group();
-      const a = await loadEntry(e);
+      const a = await loadEntry(e, { weapon: ctx.state.weapon });
       const it = place(a, 0, 0, { id: e.id, sub: e.source, plinth: e.category === 'character' ? 0.8 : 1.6 });
       g.add(it.root);
       const items: BoardItem[] = [it];

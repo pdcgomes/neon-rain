@@ -28,6 +28,8 @@ export interface LabState {
   cfb: string;
   cfblend: number;
   inspector: boolean;
+  /** Weapon held by imported characters: '' = manifest default, 'none', or a manifest id. */
+  weapon: string;
 }
 
 export const DEFAULTS: LabState = {
@@ -55,6 +57,7 @@ export const DEFAULTS: LabState = {
   cfb: 'run',
   cfblend: 0.3,
   inspector: true,
+  weapon: '',
 };
 
 const BOOL_KEYS = ['loop', 'playing', 'sil', 'rain', 'wet', 'turn', 'skel', 'ghost', 'contact', 'cf', 'inspector'] as const;

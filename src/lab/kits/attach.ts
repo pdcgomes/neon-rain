@@ -14,6 +14,8 @@ export interface AttachSpec {
   /** Clip whose pose defines the aim: the barrel points from the grip hand towards the other hand. */
   aimClip?: string;
   aimTime?: number;
+  /** Barrel direction in the aim pose: towards the support hand (long guns) or along the forearm (pistols). */
+  aim?: 'support' | 'forearm';
 }
 
 const MUZZLE: Record<NonNullable<AttachSpec['muzzle']>, THREE.Vector3> = {
@@ -42,6 +44,7 @@ export function attachToHand(character: THREE.Object3D, item: THREE.Object3D, cl
   if (!hand) return false;
   const other = findBone(character, boneName.startsWith('Right') ? boneName.replace('Right', 'Left') : boneName.replace('Left', 'Right'));
   const fingers = findBone(character, boneName.replace('Hand', 'HandMiddle1'));
+  const forearm = findBone(character, boneName.replace('Hand', 'ForeArm'));
 
   // Weapon in its canonical frame, grip at the origin.
   item.updateMatrixWorld(true);
@@ -80,8 +83,10 @@ export function attachToHand(character: THREE.Object3D, item: THREE.Object3D, cl
   const handS = new THREE.Vector3();
   handM.decompose(handPos, handQ, handS);
   let forward = new THREE.Vector3(0, 0, 1);
-  if (other) {
-    const d = new THREE.Vector3().setFromMatrixPosition(inChar(other)).sub(handPos);
+  const from = spec.aim === 'forearm' ? forearm : undefined;
+  const to = spec.aim === 'forearm' ? hand : other;
+  if (to) {
+    const d = new THREE.Vector3().setFromMatrixPosition(inChar(to)).sub(from ? new THREE.Vector3().setFromMatrixPosition(inChar(from)) : handPos);
     if (d.lengthSq() > 1e-6) forward = d.normalize();
   }
   const up = new THREE.Vector3(0, 1, 0);

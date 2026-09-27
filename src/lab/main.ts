@@ -238,7 +238,7 @@ function updateLabels(): void {
 
 // ------------------------------------------------------------------ state changes
 
-const REBUILD: (keyof LabState)[] = ['board', 'style', 'subject'];
+const REBUILD: (keyof LabState)[] = ['board', 'style', 'subject', 'weapon'];
 
 function change(patch: Partial<LabState>): void {
   const rebuild = REBUILD.some((k) => k in patch && patch[k] !== state[k]);

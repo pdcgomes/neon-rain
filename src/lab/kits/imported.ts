@@ -33,6 +33,8 @@ export interface ManifestEntry {
   extraAnimations?: { file: string; clip: string }[];
   /** Other manifest assets held by this character (weapons). */
   attach?: AttachSpec[];
+  /** Marks a holdable item (weapon) and how it sits in the hand. */
+  hold?: Omit<AttachSpec, 'asset'>;
 }
 
 export interface Manifest {
@@ -74,6 +76,10 @@ export async function loadManifest(): Promise<Manifest> {
 
 export function importedEntries(): ManifestEntry[] {
   return [...manifest.assets, ...dropped];
+}
+
+export function weaponEntries(): ManifestEntry[] {
+  return importedEntries().filter((e) => e.hold);
 }
 
 export function addDropped(file: File): ManifestEntry {
@@ -184,7 +190,7 @@ function applyGlowKey(obj: THREE.Object3D, hex: string): void {
   });
 }
 
-export async function loadEntry(e: ManifestEntry): Promise<LabAsset> {
+export async function loadEntry(e: ManifestEntry, opts: { weapon?: string } = {}): Promise<LabAsset> {
   const url = resolveUrl(e.file);
   if (e.format === 'vox' || url.toLowerCase().endsWith('.vox')) {
     const buf = await (await fetch(url)).arrayBuffer();
@@ -231,9 +237,12 @@ export async function loadEntry(e: ManifestEntry): Promise<LabAsset> {
     }
   }
   const held: string[] = [];
-  for (const a of e.attach ?? []) {
-    const src = importedEntries().find((x) => x.id === a.asset);
-    if (src && attachToHand(obj, (await loadEntry(src)).object, clips, a)) held.push(src.name);
+  const attach = opts.weapon === 'none' ? [] : opts.weapon ? [{ asset: opts.weapon }] : (e.attach ?? []);
+  if (e.category === 'character') {
+    for (const a of attach) {
+      const src = importedEntries().find((x) => x.id === a.asset);
+      if (src && attachToHand(obj, (await loadEntry(src)).object, clips, { ...src.hold, ...a })) held.push(src.name);
+    }
   }
   const notes = [
     e.notes,
