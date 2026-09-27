@@ -168,7 +168,8 @@ export class Actors {
     );
   }
 
-  update(world: World, alpha: number, dt: number, time: number, selected: ReadonlySet<number>): void {
+  /** `skip`: entities drawn by another renderer (imported models); only their rings and markers are drawn here. */
+  update(world: World, alpha: number, dt: number, time: number, selected: ReadonlySet<number>, skip: ReadonlySet<number> = new Set()): void {
     let n = 0;
     let legN = 0;
     let visorN = 0;
@@ -212,39 +213,43 @@ export class Actors {
       this.s.setScalar(look.scale);
       this.root.compose(this.v, this.q, this.s);
 
+      const drawBody = !skip.has(e.id);
+
       // Torso (coat) with hit flash and persuasion tint.
-      this.tmp.copy(this.root).multiply(this.local.torso);
-      this.tmp.multiply(this.m2.makeScale(1, look.coatLen, 1));
-      this.torso.setMatrixAt(n, this.tmp);
-      const flash = e.alive ? Math.max(0, 1 - (world.time - e.lastDamagedAt) / 0.12) : 0;
-      this.c.copy(look.coat);
-      if (!e.alive) this.c.multiplyScalar(0.55);
-      if (flash > 0) this.c.lerp(this.white, flash);
-      this.torso.setColorAt(n, this.c);
+      if (drawBody) {
+        this.tmp.copy(this.root).multiply(this.local.torso);
+        this.tmp.multiply(this.m2.makeScale(1, look.coatLen, 1));
+        this.torso.setMatrixAt(n, this.tmp);
+        const flash = e.alive ? Math.max(0, 1 - (world.time - e.lastDamagedAt) / 0.12) : 0;
+        this.c.copy(look.coat);
+        if (!e.alive) this.c.multiplyScalar(0.55);
+        if (flash > 0) this.c.lerp(this.white, flash);
+        this.torso.setColorAt(n, this.c);
 
-      this.tmp.copy(this.root).multiply(this.local.head);
-      this.head.setMatrixAt(n, this.tmp);
-      this.head.setColorAt(n, look.skin);
-      n++;
+        this.tmp.copy(this.root).multiply(this.local.head);
+        this.head.setMatrixAt(n, this.tmp);
+        this.head.setColorAt(n, look.skin);
+        n++;
 
-      // Legs swing from the hip.
-      const swing = e.alive ? Math.sin(an.phase) * 0.7 * move : 0;
-      for (const side of [-1, 1]) {
-        this.tmp.copy(this.root);
-        this.tmp.multiply(this.m2.makeTranslation(side * 0.12, 0.78, 0));
-        this.tmp.multiply(this.m3.makeRotationX(swing * side));
-        this.legs.setMatrixAt(legN++, this.tmp);
+        // Legs swing from the hip.
+        const swing = e.alive ? Math.sin(an.phase) * 0.7 * move : 0;
+        for (const side of [-1, 1]) {
+          this.tmp.copy(this.root);
+          this.tmp.multiply(this.m2.makeTranslation(side * 0.12, 0.78, 0));
+          this.tmp.multiply(this.m3.makeRotationX(swing * side));
+          this.legs.setMatrixAt(legN++, this.tmp);
+        }
       }
 
       const persuaded = e.faction === 'player' && e.kind !== 'agent';
       const visorColor = persuaded ? this.persuadedVisor : look.visor;
-      if (visorColor && e.alive) {
+      if (drawBody && visorColor && e.alive) {
         this.tmp.copy(this.root).multiply(this.local.visor);
         this.visor.setMatrixAt(visorN, this.tmp);
         this.visor.setColorAt(visorN++, visorColor);
       }
 
-      if (e.alive && e.weapons.length && !e.holstered) {
+      if (drawBody && e.alive && e.weapons.length && !e.holstered) {
         const wid = e.weapons[e.weaponIdx];
         const gl = wid === 'minigun' || wid === 'gauss' ? 1.9 : wid === 'uzi' || wid === 'enemyUzi' || wid === 'riotGun' ? 1.2 : 0.7;
         const gw = wid === 'minigun' || wid === 'gauss' ? 1.8 : 1;

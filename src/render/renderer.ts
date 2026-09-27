@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { SimEvent } from '../sim/types.ts';
 import type { World } from '../sim/world.ts';
 import { Actors } from './actors.ts';
+import { AgentModels } from './agentModels.ts';
 import { TrafficLights, Vehicles } from './vehicles.ts';
 import { CameraRig } from './camera.ts';
 import { City } from './cityBuilder.ts';
@@ -56,6 +57,7 @@ export class GameRenderer {
   readonly city: City;
   readonly fx: Fx;
   private actors = new Actors();
+  private agentModels = new AgentModels();
   private vehicles = new Vehicles();
   private lights: TrafficLights;
   private rain = new Rain();
@@ -108,7 +110,7 @@ export class GameRenderer {
     this.city = new City(world.map);
     this.fx = new Fx(this.scene, world);
     this.lights = new TrafficLights(world);
-    this.scene.add(this.city.group, this.actors.group, this.vehicles.group, this.lights.group, this.fx.group, this.rain.group);
+    this.scene.add(this.city.group, this.actors.group, this.agentModels.group, this.vehicles.group, this.lights.group, this.fx.group, this.rain.group);
 
     this.post = new PostFX(this.renderer, this.scene, this.rig.camera);
     this.resize();
@@ -236,7 +238,8 @@ export class GameRenderer {
     this.city.vtolPad.scale.setScalar(extracting ? 1 + Math.sin(time * 5) * 0.03 : 1);
     this.city.escapeBeam.visible = world.alarm && world.phase === 'eliminate';
 
-    this.actors.update(world, alpha, dt, time, view.selected);
+    this.agentModels.update(world, alpha, dt);
+    this.actors.update(world, alpha, dt, time, view.selected, this.agentModels.ids);
     this.vehicles.update(world, alpha, time);
     this.lights.update(world);
     this.fx.update(world, alpha, dt, time, view);
