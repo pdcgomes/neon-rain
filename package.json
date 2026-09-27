@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "sim:smoke": "node scripts/sim-smoke.ts",
-    "sim:traffic": "node scripts/traffic-check.ts"
+    "sim:traffic": "node scripts/traffic-check.ts",
+    "art:tripo": "NODE_USE_ENV_PROXY=1 node tools/art/tripo.ts"
   },
   "dependencies": {
     "howler": "^2.2.4",

@@ -24,6 +24,8 @@ export interface ManifestEntry {
   accent?: string;
   notes?: string;
   format?: 'glb' | 'vox';
+  /** Extra GLBs whose animations play on this model (e.g. one file per Tripo retarget). */
+  extraAnimations?: { file: string; clip: string }[];
 }
 
 export interface Manifest {
@@ -137,6 +139,18 @@ export async function loadEntry(e: ManifestEntry): Promise<LabAsset> {
       c.name = id;
       clips.push(c);
     } else unmapped.push(clip.name);
+  }
+  for (const x of e.extraAnimations ?? []) {
+    try {
+      const g = await loader.loadAsync(resolveUrl(x.file));
+      const c = g.animations[0]?.clone();
+      if (c && !clips.some((k) => k.name === x.clip)) {
+        c.name = x.clip;
+        clips.push(c);
+      }
+    } catch {
+      unmapped.push(`${x.file} (failed to load)`);
+    }
   }
   const notes = [e.notes, unmapped.length ? `Unmapped clips: ${unmapped.join(', ')}` : ''].filter(Boolean).join(' · ');
   return { object: obj, clips, name: e.name, category: e.category, source: e.source ?? url, notes };

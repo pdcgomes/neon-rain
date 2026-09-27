@@ -23,7 +23,9 @@ function uniqueColors(obj: THREE.Object3D): { hex: string; glow: boolean }[] {
       if (s.vertexColors && m.geometry.attributes.color) {
         const c = m.geometry.attributes.color as THREE.BufferAttribute;
         for (let i = 0; i < c.count && seen.size < 24; i += 4) {
-          const hex = `#${new THREE.Color(c.getX(i), c.getY(i), c.getZ(i)).getHexString()}`;
+          const col = new THREE.Color(c.getX(i), c.getY(i), c.getZ(i)).multiply(s.color);
+          if (s.emissive && s.emissive.getHex() !== 0) col.copy(s.emissive);
+          const hex = `#${col.getHexString()}`;
           if (!seen.has(hex)) seen.set(hex, s.type === 'MeshBasicMaterial');
         }
       } else if (s.color) {
@@ -75,7 +77,7 @@ export class Inspector {
           ${sel ? `<span>Height</span><span>${height.toFixed(2)} m</span>` : ''}
           ${sel && sel.category === 'character' ? `<span>Bones</span><span>${boneCount(obj!)}</span><span>Clips</span><span>${sel.clips.length} / ${CATALOGUE.length}</span>` : ''}
         </div>
-        ${sel?.notes ? `<div class="warn-note" style="margin-top:6px">${sel.notes}</div>` : ''}
+        ${sel?.notes ? `<div class="${/No imported|Unmapped/.test(sel.notes) ? 'warn-note' : 'note'}" style="margin-top:6px">${sel.notes}</div>` : ''}
         ${!sel ? '<div class="note" style="margin-top:6px">Click an asset to inspect it. Double-click (or F) to frame it.</div>' : ''}
       </div>
       <div class="ins-sec">
@@ -103,7 +105,7 @@ export class Inspector {
           : ''
       }
       ${
-        boardId === 'clipgrid'
+        boardId === 'clipgrid' || boardId === 'reference'
           ? `<div class="ins-sec"><div class="ins-h">CLIP GRID SUBJECT</div><select data-k="subject" style="width:100%">${LINEUP.map((l) => opt(`${l.kind}:${l.variant}`, state.subject, design(l.kind, l.variant).name)).join('')}</select></div>`
           : ''
       }

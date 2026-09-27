@@ -78,7 +78,14 @@ function buildHead(rig: Rig, d: Design): void {
   // Visor: the signature Syndicate-agent glow.
   const eyeY = 0.005 * s;
   const front = headR * (d.head === 'helmet' ? 1.28 : 0.93);
-  if (d.visor === 'band') head.add(mesh(box(0.2 * s, 0.035 * s, 0.05 * s), glow(d.accent, 3.2), 0, eyeY, front));
+  if (d.visor === 'band') {
+    // Wraparound band: an open cylinder segment hugging the face, with a dark frame.
+    const band = new THREE.CylinderGeometry(headR * 1.0, headR * 1.0, 0.034 * s, 12, 1, true, -Math.PI * 0.62, Math.PI * 1.24);
+    head.add(mesh(band, mat(d.accent, { emissive: 3.2, side: THREE.DoubleSide }), 0, eyeY, 0.012));
+    const frame = new THREE.CylinderGeometry(headR * 1.03, headR * 1.03, 0.05 * s, 12, 1, true, -Math.PI * 0.64, Math.PI * 1.28);
+    head.add(mesh(frame, mat('#0b0c10', { rough: 0.3, metal: 0.8, side: THREE.DoubleSide }), 0, eyeY, 0.004));
+    head.add(mesh(box(0.02, 0.04 * s, 0.03), glow(d.accent, 2.4), headR * 0.98, -0.03 * s, -0.02));
+  }
   else if (d.visor === 'shades') head.add(mesh(box(0.18 * s, 0.04 * s, 0.04 * s), glow(d.accent, 1.6), 0, eyeY, front));
   else if (d.visor === 'full') head.add(mesh(box(0.2 * s, 0.07 * s, 0.05 * s), glow(d.accent, 2.8), 0, eyeY, front));
   attach(rig, 'Head', head);
@@ -185,6 +192,13 @@ function buildLimbs(rig: Rig, d: Design): void {
     attach(rig, `${side}UpLeg`, mesh(limb(rig.seg.thigh, 0.078 * b, 0.064 * b), cloth(d.pants)));
     attach(rig, `${side}Leg`, mesh(limb(rig.seg.shin, 0.062 * b, 0.05 * b), cloth(d.pants)));
     attach(rig, `${side}Foot`, mesh(box(0.1 * b, 0.08 * s, 0.24 * s).translate(0, -0.035 * s, 0.05 * s), leather(d.boots)));
+    attach(rig, `${side}Foot`, mesh(box(0.108 * b, 0.022 * s, 0.25 * s).translate(0, -0.07 * s, 0.05 * s), mat('#050507', { rough: 0.9 })));
+    attach(rig, `${side}Foot`, mesh(box(0.09 * b, 0.05 * s, 0.05 * s).rotateX(0.5).translate(0, -0.03 * s, 0.16 * s), leather(d.boots)));
+  }
+  if (d.kind === 'agent' || d.kind === 'rival') {
+    // Thigh holster with a status light.
+    attach(rig, 'RightUpLeg', mesh(box(0.05, 0.16 * s, 0.1).translate(-0.07 * b, -0.14 * s, 0), leather('#0b0c10')));
+    attach(rig, 'RightUpLeg', mesh(box(0.012, 0.02, 0.02), glow(d.accent, 2.4), -0.098 * b, -0.1 * s, 0.03));
   }
   if (d.shoulderLight) attach(rig, 'LeftArm', mesh(box(0.06, 0.04, 0.06), glow(d.accent, 3), 0.02, 0.06, 0));
 }

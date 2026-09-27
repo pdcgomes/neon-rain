@@ -133,6 +133,30 @@ Put files in `public/lab/assets/` and list them in `public/lab/manifest.json`. Y
 
 Models are scaled to `height` and placed on the floor. Clips are mapped onto the catalogue by name: Mixamo names are recognised, and `clipAliases` covers the rest. The inspector lists missing clips. The conventions: +Y up, the character faces +Z, metres, and a Mixamo skeleton (`mixamorig:*`) so every character shares one set of clips.
 
+### Ready-made models
+
+`public/lab/assets/generated/` holds models baked from the lab's kits. They load back in through the imported-GLB path; each one has a board under **Imported** in the lab.
+
+- Five characters in both styles: agents Kade and Mara, a rival agent, a police officer, and a courier. Each is a single skinned mesh on a Mixamo-named skeleton with all 17 clips, and opens in Blender for touch-ups.
+- `.vox` sources for the Style C characters, which open in MagicaVoxel.
+- A car and the extraction VTOL in both styles.
+
+To regenerate them after changing a kit, run `await lab.exportModels()` in the lab's dev console. `await lab.captureRefs('agent:0')` renders front, left, back and right reference images to `public/lab/assets/refs/`.
+
+### Tripo
+
+`tools/art/tripo.ts` runs the Tripo 3D API. It generates from a text prompt, the front reference image, or all four reference views; applies Tripo's voxel stylise for Style C; rigs to a Mixamo skeleton; and retargets the preset animations. Results go to `public/lab/assets/tripo/` and are registered in the manifest. The API key is read from `.env.local` (`TRIPO_API_KEY=...`).
+
+```sh
+npm run art:tripo -- balance
+npm run art:tripo -- presets
+npm run art:tripo -- make agent --from multiview --rig              # Style A
+npm run art:tripo -- make agent --style voxel --from multiview --rig
+npm run art:tripo -- make police --from text --dry-run              # print payloads only
+```
+
+Finished stages are logged, so a run that is interrupted, or that stops when credits run out, picks up where it left off.
+
 ## Dev tooling
 
 - `node scripts/sim-smoke.ts` runs the whole mission headless with a scripted squad, then checks that two runs with the same inputs produce identical state.

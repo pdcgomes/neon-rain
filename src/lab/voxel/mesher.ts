@@ -78,7 +78,9 @@ export function meshVoxels(
   opts: { glowStrength?: number; rough?: number; metal?: number } = {},
 ): THREE.Group {
   const solid: Out = { pos: [], nrm: [], col: [], idx: [] };
-  const glow: Out = { pos: [], nrm: [], col: [], idx: [] };
+  // One output per glowing colour: glTF can't tint emission per vertex, so each glow
+  // colour becomes its own mesh and material.
+  const glows = new Map<number, Out>();
   const dims = [grid.nx, grid.ny, grid.nz];
   const g = (p: number[]) => grid.get(p[0], p[1], p[2]);
 
@@ -121,7 +123,11 @@ export function meshVoxels(
           du[u] = w;
           dv[v] = h;
           const colorIdx = Math.abs(c);
-          const out = palette.emissive.has(colorIdx) ? glow : solid;
+          let out = solid;
+          if (palette.emissive.has(colorIdx)) {
+            out = glows.get(colorIdx) ?? { pos: [], nrm: [], col: [], idx: [] };
+            glows.set(colorIdx, out);
+          }
           const col = palette.colors[colorIdx] ?? new THREE.Color(1, 0, 1);
           const nrm = [0, 0, 0];
           nrm[d] = c > 0 ? 1 : -1;
@@ -167,10 +173,14 @@ export function meshVoxels(
     m.receiveShadow = true;
     group.add(m);
   }
-  if (glow.idx.length) {
-    const gm = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
-    gm.color.setScalar(opts.glowStrength ?? 1.7);
-    group.add(new THREE.Mesh(build(glow), gm));
+  for (const [ci, out] of glows) {
+    const gm = new THREE.MeshBasicMaterial({ color: palette.colors[ci].clone(), toneMapped: false });
+    gm.userData.glowStrength = opts.glowStrength ?? 1.7;
+    gm.color.multiplyScalar(gm.userData.glowStrength);
+    gm.userData.labColor = `#${palette.colors[ci].getHexString()}`;
+    gm.userData.labEmissive = true;
+    group.add(new THREE.Mesh(build(out), gm));
   }
+  group.userData.voxel = { grid, palette, size, anchor };
   return group;
 }

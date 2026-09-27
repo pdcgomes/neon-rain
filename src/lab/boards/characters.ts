@@ -72,3 +72,26 @@ export const lineupBoard: BoardDef = {
     return { group: g, items, labels, bounds: boundsOf(items, 0.6), animated: true, turntable: false, view: 'front', subtitle: `Heights against a 1.8 m reference · ${ctx.kit.label}` };
   },
 };
+
+/** One character in A-pose, for turnarounds and as the input image for Tripo image/multiview-to-3D. */
+export const referenceBoard: BoardDef = {
+  id: 'reference',
+  section: 'Characters',
+  title: 'Reference Pose',
+  icon: 'person',
+  styled: true,
+  async build(ctx) {
+    const [k, v] = ctx.state.subject.split(':');
+    const kind = (k || 'agent') as Parameters<typeof ctx.kit.character>[0];
+    const a = await ctx.kit.character(kind, Number(v) || 0);
+    const d = design(kind, Number(v) || 0);
+    a.object.traverse((o) => {
+      if (o.name === 'mixamorigLeftArm') o.rotation.z = 0.8;
+      if (o.name === 'mixamorigRightArm') o.rotation.z = -0.8;
+    });
+    const it = place(a, 0, 0, { id: ctx.state.subject, label: d.name, sub: 'A-pose' });
+    const g = new THREE.Group();
+    g.add(it.root);
+    return { group: g, items: [it], bounds: boundsOf([it], 0.25), animated: false, turntable: true, itemLabels: false, view: 'front', polar: Math.PI / 2 - 0.02, subtitle: `${d.name} in A-pose · ${ctx.kit.label} · pick the subject in the Clip Grid inspector` };
+  },
+};

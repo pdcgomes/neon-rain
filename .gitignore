@@ -9,3 +9,6 @@ shots
 
 # Local secrets
 .env.local
+
+# Tripo task log (resume state)
+tools/art/tripo-log.json

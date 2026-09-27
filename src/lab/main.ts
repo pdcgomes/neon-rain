@@ -4,7 +4,7 @@ import { AnimOverlays } from './anim/overlays.ts';
 import { AnimPlayer } from './anim/player.ts';
 import { Timeline } from './anim/timeline.ts';
 import { castMotionBoard, clipGridBoard, gameScaleBoard, treadmillBoard } from './boards/animation.ts';
-import { castBoard, lineupBoard } from './boards/characters.ts';
+import { castBoard, lineupBoard, referenceBoard } from './boards/characters.ts';
 import { compareAC, compareAll } from './boards/compare.ts';
 import { allPropsBoard, buildingsBoard, propBoards, signageBoard, streetBoard } from './boards/environment.ts';
 import { importedBoard, importedOverview } from './boards/imported.ts';
@@ -14,6 +14,7 @@ import { lowpolyKit } from './kits/lowpoly.ts';
 import { buildingUniforms } from './kits/shared.ts';
 import type { StyleId, StyleKit } from './kits/types.ts';
 import { voxelKit } from './kits/voxel.ts';
+import { DEFAULT_CHARACTERS, DEFAULT_PROPS, exportCharacter, exportProp, type CharacterJob, type PropJob } from './export/models.ts';
 import { Inspector } from './shell/inspector.ts';
 import { Registry, type BoardItem, type BoardResult } from './shell/registry.ts';
 import { Sidebar } from './shell/sidebar.ts';
@@ -32,6 +33,7 @@ const urlHadCam = !!state.cam;
 const registry = new Registry();
 for (const g of ['agents', 'rivals', 'law', 'civilians']) registry.add(castBoard(g));
 registry.add(lineupBoard);
+registry.add(referenceBoard);
 registry.add(buildingsBoard);
 registry.add(signageBoard);
 registry.add(streetBoard);
@@ -200,7 +202,7 @@ function buildLabels(r: BoardResult): void {
   labels = [];
   for (const it of r.itemLabels === false ? [] : r.items) {
     const el = document.createElement('div');
-    el.className = `lbl${it.asset.notes ? ' warn' : ''}`;
+    el.className = `lbl${it.asset.notes && /No imported|Unmapped/.test(it.asset.notes) ? ' warn' : ''}`;
     el.innerHTML = `${it.label}${it.sublabel ? `<small>${it.sublabel}</small>` : ''}`;
     labelsEl.appendChild(el);
     labels.push({ el, pos: new THREE.Vector3(), item: it });
@@ -419,6 +421,36 @@ async function boot(): Promise<void> {
   set: (patch: Partial<LabState>) => {
     change(patch);
     return ready;
+  },
+  /**
+   * Dev only: renders the reference board from four sides (front, left, back, right) and saves
+   * the images to public/lab/assets/refs, the inputs for Tripo multiview-to-3D.
+   */
+  async captureRefs(subject = 'agent:0', style: StyleId = 'lowpoly') {
+    change({ board: 'reference', subject, style, light: 'studio', sil: false, rain: false, turn: false, px: 1 });
+    await ready;
+    const it = current!.items[0];
+    stage.setReferenceBackdrop(true);
+    const out: string[] = [];
+    const views: [string, number][] = [['front', 0], ['left', Math.PI / 2], ['back', Math.PI], ['right', -Math.PI / 2]];
+    for (const [name, yaw] of views) {
+      it.spin.rotation.y = yaw;
+      const url = stage.captureClean();
+      const bin = Uint8Array.from(atob(url.split(',')[1]), (c) => c.charCodeAt(0));
+      const file = `assets/refs/${subject.replace(':', '_')}_${style}_${name}.jpg`;
+      await fetch(`/__lab/save?file=${encodeURIComponent(file)}`, { method: 'POST', body: bin });
+      out.push(file);
+    }
+    it.spin.rotation.y = 0;
+    stage.setReferenceBackdrop(false);
+    return out.join('\n');
+  },
+  /** Dev only: bakes kit characters and props to GLB (+ .vox) under public/lab/assets/generated. */
+  async exportModels(chars: CharacterJob[] = DEFAULT_CHARACTERS, props: PropJob[] = DEFAULT_PROPS) {
+    const log: string[] = [];
+    for (const j of chars) log.push(await exportCharacter(kits[j.style], j));
+    for (const j of props) log.push(await exportProp(kits[j.style], j));
+    return log.join('\n');
   },
 };
 

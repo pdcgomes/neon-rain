@@ -128,6 +128,15 @@ export class Stage {
     this.applyFloor();
   }
 
+  /** Plain light backdrop with no floor or fog: clean input images for image-to-3D. */
+  setReferenceBackdrop(on: boolean): void {
+    this.floor.visible = !on;
+    if (on) {
+      this.scene.background = new THREE.Color('#d9dae0');
+      this.scene.fog = null;
+    } else this.setPreset(this.preset);
+  }
+
   setWet(on: boolean): void {
     this.wet = on;
     this.applyFloor();
@@ -214,6 +223,15 @@ export class Stage {
       return;
     }
     this.post.render(dt, performance.now() / 1000);
+  }
+
+  /** Raw render without post-processing (no grain or bloom): clean input for image-to-3D. */
+  captureClean(type = 'image/jpeg', quality = 0.92): string {
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.render(this.scene, this.camera);
+    const url = this.canvas.toDataURL(type, quality);
+    this.renderer.toneMapping = THREE.NoToneMapping;
+    return url;
   }
 
   capturePNG(dt: number, focus: THREE.Vector3): string {

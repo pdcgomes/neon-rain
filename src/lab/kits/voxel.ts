@@ -69,6 +69,12 @@ function voxelCharacter(d: Design): { rig: Rig; parts: Part[]; palette: VoxelPal
     hg.fill(1, 0, 1, 1 + hw, hw - 1, 1 + hw, skin);
   }
   if (d.visor === 'band' || d.visor === 'shades') hg.fill(1, 2, hw, 1 + hw, 3, hw + 1, accent);
+  if (d.visor === 'band') {
+    // Wraps round the temples, plus an earpiece light.
+    hg.set(0, 2, hw, accent);
+    hg.set(hw + 1, 2, hw, accent);
+    hg.set(hw + 1, 1, hw - 1, accent);
+  }
   if (d.visor === 'none' && d.head !== 'helmet') {
     hg.set(2, 2, hw, dark);
     hg.set(3, 2, hw, dark);
@@ -163,6 +169,12 @@ function voxelCharacter(d: Design): { rig: Rig; parts: Part[]; palette: VoxelPal
     shin.grid.fill(0, 1, 0, legW, sh2, legW, pants);
     shin.grid.fill(0, 0, 0, legW, 2, legW + 2, boots);
     parts.push(upper, fore, thigh, shin);
+  }
+  if (d.kind === 'agent' || d.kind === 'rival') {
+    const holster = part('RightUpLeg', 1, 3, 2, [legW / 2 + 1, vu(rig.seg.thigh) * 0.6, 1]);
+    holster.grid.fill(0, 0, 0, 1, 3, 2, dark);
+    holster.grid.set(0, 2, 1, accent);
+    parts.push(holster);
   }
   if (d.shoulderLight) {
     const l = part('LeftArm', 1, 1, 1, [0.5, -1, 0.5]);

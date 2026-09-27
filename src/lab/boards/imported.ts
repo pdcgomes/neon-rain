@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { importedEntries, loadEntry, type ManifestEntry } from '../kits/imported.ts';
 import type { BoardDef, BoardItem } from '../shell/registry.ts';
-import { boundsOf, grid, place } from './layout.ts';
+import { boundsOf, place } from './layout.ts';
 
 export function importedBoard(e: ManifestEntry): BoardDef {
   return {
@@ -40,12 +40,22 @@ export const importedOverview: BoardDef = {
     const g = new THREE.Group();
     const items: BoardItem[] = [];
     const entries = importedEntries();
-    for (const s of grid(entries, 2.6, 5)) {
-      const a = await loadEntry(s.item);
-      const it = place(a, s.x, s.z, { id: s.item.id, sub: s.item.source, plinth: 0.9 });
-      items.push(it);
-      g.add(it.root);
-      ctx.anim.register(a, a.object);
+    // Characters in the front row, everything else behind, spaced by actual footprint.
+    const rows = [entries.filter((e) => e.category === 'character'), entries.filter((e) => e.category !== 'character')];
+    for (const [r, row] of rows.entries()) {
+      const loaded = await Promise.all(row.map((e) => loadEntry(e)));
+      const widths = loaded.map((a) => {
+        const s = new THREE.Box3().setFromObject(a.object, true).getSize(new THREE.Vector3());
+        return Math.max(s.x, s.z) + 0.9;
+      });
+      let x = -widths.reduce((s, w) => s + w, 0) / 2;
+      for (const [i, a] of loaded.entries()) {
+        const it = place(a, x + widths[i] / 2, r === 0 ? 2 : -5, { id: row[i].id, sub: row[i].format === 'vox' ? '.vox' : undefined });
+        x += widths[i];
+        items.push(it);
+        g.add(it.root);
+        ctx.anim.register(a, a.object);
+      }
     }
     return {
       group: g,

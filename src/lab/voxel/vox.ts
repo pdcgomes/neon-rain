@@ -71,53 +71,59 @@ export function parseVox(buf: ArrayBuffer): { grid: VoxelGrid; palette: VoxelPal
 
 /** Writes a VoxelGrid back out as a .vox (for MagicaVoxel touch-ups of generated models). */
 export function writeVox(grid: VoxelGrid, palette: VoxelPalette): ArrayBuffer {
-  const vox: number[] = [];
+  const bytes: number[] = [];
+  const i32 = (v: number) => bytes.push(v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255);
+  const tag = (s: string) => {
+    for (let i = 0; i < 4; i++) bytes.push(s.charCodeAt(i));
+  };
+  const chunk = (id: string, body: number[]) => {
+    tag(id);
+    i32(body.length);
+    i32(0);
+    bytes.push(...body);
+  };
+  const le = (v: number) => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
+  const str = (s: string) => [...le(s.length), ...[...s].map((c) => c.charCodeAt(0))];
+
+  const size = [...le(grid.nx), ...le(grid.nz), ...le(grid.ny)];
+  const xyzi: number[] = [];
+  let n = 0;
   for (let z = 0; z < grid.nz; z++)
     for (let y = 0; y < grid.ny; y++)
       for (let x = 0; x < grid.nx; x++) {
         const c = grid.get(x, y, z);
-        if (c) vox.push(x, grid.nz - 1 - z, y, c);
+        if (!c) continue;
+        xyzi.push(x, grid.nz - 1 - z, y, c);
+        n++;
       }
-  const n = vox.length / 4;
-  const sizeLen = 12 + 12;
-  const xyziLen = 12 + 4 + vox.length;
-  const rgbaLen = 12 + 1024;
-  const total = 8 + 12 + sizeLen + xyziLen + rgbaLen;
-  const buf = new ArrayBuffer(total);
-  const dv = new DataView(buf);
-  let o = 0;
-  const tag = (s: string) => {
-    for (let i = 0; i < 4; i++) dv.setUint8(o++, s.charCodeAt(i));
-  };
-  const i32 = (v: number) => {
-    dv.setInt32(o, v, true);
-    o += 4;
-  };
+  const rgba: number[] = [];
+  for (let i = 1; i <= 256; i++) {
+    const c = palette.colors[i]?.clone().convertLinearToSRGB();
+    rgba.push(c ? Math.round(c.r * 255) : 0, c ? Math.round(c.g * 255) : 0, c ? Math.round(c.b * 255) : 0, 255);
+  }
+  const matls: number[][] = [];
+  for (const idx of palette.emissive) {
+    const dict: [string, string][] = [
+      ['_type', '_emit'],
+      ['_emit', '1'],
+      ['_flux', '2'],
+    ];
+    matls.push([...le(idx), ...le(dict.length), ...dict.flatMap(([k, v]) => [...str(k), ...str(v)])]);
+  }
+
   tag('VOX ');
   i32(150);
+  const children: number[] = [];
+  const saved = bytes.splice(0, bytes.length);
+  chunk('SIZE', size);
+  chunk('XYZI', [...le(n), ...xyzi]);
+  chunk('RGBA', rgba);
+  for (const m of matls) chunk('MATL', m);
+  children.push(...bytes.splice(0, bytes.length));
+  bytes.push(...saved);
   tag('MAIN');
   i32(0);
-  i32(sizeLen + xyziLen + rgbaLen);
-  tag('SIZE');
-  i32(12);
-  i32(0);
-  i32(grid.nx);
-  i32(grid.nz);
-  i32(grid.ny);
-  tag('XYZI');
-  i32(4 + vox.length);
-  i32(0);
-  i32(n);
-  for (const b of vox) dv.setUint8(o++, b);
-  tag('RGBA');
-  i32(1024);
-  i32(0);
-  for (let i = 1; i <= 256; i++) {
-    const c = palette.colors[i];
-    dv.setUint8(o++, c ? Math.round(c.r * 255) : 0);
-    dv.setUint8(o++, c ? Math.round(c.g * 255) : 0);
-    dv.setUint8(o++, c ? Math.round(c.b * 255) : 0);
-    dv.setUint8(o++, 255);
-  }
-  return buf;
+  i32(children.length);
+  bytes.push(...children);
+  return new Uint8Array(bytes).buffer;
 }

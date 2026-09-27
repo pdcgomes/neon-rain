@@ -1,3 +1,181 @@
 {
-  "assets": []
+  "assets": [
+    {
+      "id": "agent_0_a",
+      "name": "Kade · A",
+      "file": "assets/generated/agent_0_a.glb",
+      "category": "character",
+      "kind": "agent",
+      "source": "Style A kit → skinned GLB (873 tris, 17 clips)",
+      "height": 1.84,
+      "notes": "Mixamo-named skeleton, rigid skinning"
+    },
+    {
+      "id": "agent_3_a",
+      "name": "Mara · A",
+      "file": "assets/generated/agent_3_a.glb",
+      "category": "character",
+      "kind": "agent",
+      "source": "Style A kit → skinned GLB (836 tris, 17 clips)",
+      "height": 1.76,
+      "notes": "Mixamo-named skeleton, rigid skinning"
+    },
+    {
+      "id": "rival_0_a",
+      "name": "Rival Agent · A",
+      "file": "assets/generated/rival_0_a.glb",
+      "category": "character",
+      "kind": "rival",
+      "source": "Style A kit → skinned GLB (813 tris, 17 clips)",
+      "height": 1.83,
+      "notes": "Mixamo-named skeleton, rigid skinning"
+    },
+    {
+      "id": "police_0_a",
+      "name": "Police Officer · A",
+      "file": "assets/generated/police_0_a.glb",
+      "category": "character",
+      "kind": "police",
+      "source": "Style A kit → skinned GLB (757 tris, 17 clips)",
+      "height": 1.82,
+      "notes": "Mixamo-named skeleton, rigid skinning"
+    },
+    {
+      "id": "civilian_1_a",
+      "name": "Courier · A",
+      "file": "assets/generated/civilian_1_a.glb",
+      "category": "character",
+      "kind": "civilian",
+      "source": "Style A kit → skinned GLB (891 tris, 17 clips)",
+      "height": 1.7200000000000002,
+      "notes": "Mixamo-named skeleton, rigid skinning"
+    },
+    {
+      "id": "agent_0_c",
+      "name": "Kade · C",
+      "file": "assets/generated/agent_0_c.glb",
+      "category": "character",
+      "kind": "agent",
+      "source": "Style C kit → skinned GLB (416 tris, 17 clips)",
+      "height": 1.84,
+      "notes": "Mixamo-named skeleton, rigid skinning · MagicaVoxel source: agent_0_c.vox"
+    },
+    {
+      "id": "agent_3_c",
+      "name": "Mara · C",
+      "file": "assets/generated/agent_3_c.glb",
+      "category": "character",
+      "kind": "agent",
+      "source": "Style C kit → skinned GLB (428 tris, 17 clips)",
+      "height": 1.76,
+      "notes": "Mixamo-named skeleton, rigid skinning · MagicaVoxel source: agent_3_c.vox"
+    },
+    {
+      "id": "rival_0_c",
+      "name": "Rival Agent · C",
+      "file": "assets/generated/rival_0_c.glb",
+      "category": "character",
+      "kind": "rival",
+      "source": "Style C kit → skinned GLB (420 tris, 17 clips)",
+      "height": 1.83,
+      "notes": "Mixamo-named skeleton, rigid skinning · MagicaVoxel source: rival_0_c.vox"
+    },
+    {
+      "id": "police_0_c",
+      "name": "Police Officer · C",
+      "file": "assets/generated/police_0_c.glb",
+      "category": "character",
+      "kind": "police",
+      "source": "Style C kit → skinned GLB (316 tris, 17 clips)",
+      "height": 1.82,
+      "notes": "Mixamo-named skeleton, rigid skinning · MagicaVoxel source: police_0_c.vox"
+    },
+    {
+      "id": "civilian_1_c",
+      "name": "Courier · C",
+      "file": "assets/generated/civilian_1_c.glb",
+      "category": "character",
+      "kind": "civilian",
+      "source": "Style C kit → skinned GLB (658 tris, 17 clips)",
+      "height": 1.7200000000000002,
+      "notes": "Mixamo-named skeleton, rigid skinning · MagicaVoxel source: civilian_1_c.vox"
+    },
+    {
+      "id": "prop_car_a",
+      "name": "Car · A",
+      "file": "assets/generated/prop_car_a.glb",
+      "category": "prop",
+      "prop": "car",
+      "source": "Style A kit → GLB (212 tris)"
+    },
+    {
+      "id": "prop_vtol_a",
+      "name": "Extraction VTOL · A",
+      "file": "assets/generated/prop_vtol_a.glb",
+      "category": "prop",
+      "prop": "vtol",
+      "source": "Style A kit → GLB (508 tris)"
+    },
+    {
+      "id": "prop_car_c",
+      "name": "Car · C",
+      "file": "assets/generated/prop_car_c.glb",
+      "category": "prop",
+      "prop": "car",
+      "source": "Style C kit → GLB (140 tris)"
+    },
+    {
+      "id": "prop_vtol_c",
+      "name": "Extraction VTOL · C",
+      "file": "assets/generated/prop_vtol_c.glb",
+      "category": "prop",
+      "prop": "vtol",
+      "source": "Style C kit → GLB (420 tris)"
+    },
+    {
+      "id": "agent_0_c_vox",
+      "name": "Kade · C (.vox)",
+      "file": "assets/generated/agent_0_c.vox",
+      "category": "character",
+      "format": "vox",
+      "source": "MagicaVoxel .vox (merged rest pose, editable)",
+      "height": 1.84
+    },
+    {
+      "id": "agent_3_c_vox",
+      "name": "Mara · C (.vox)",
+      "file": "assets/generated/agent_3_c.vox",
+      "category": "character",
+      "format": "vox",
+      "source": "MagicaVoxel .vox (merged rest pose, editable)",
+      "height": 1.76
+    },
+    {
+      "id": "rival_0_c_vox",
+      "name": "Rival Agent · C (.vox)",
+      "file": "assets/generated/rival_0_c.vox",
+      "category": "character",
+      "format": "vox",
+      "source": "MagicaVoxel .vox (merged rest pose, editable)",
+      "height": 1.83
+    },
+    {
+      "id": "police_0_c_vox",
+      "name": "Police Officer · C (.vox)",
+      "file": "assets/generated/police_0_c.vox",
+      "category": "character",
+      "format": "vox",
+      "source": "MagicaVoxel .vox (merged rest pose, editable)",
+      "height": 1.82
+    },
+    {
+      "id": "civilian_1_c_vox",
+      "name": "Courier · C (.vox)",
+      "file": "assets/generated/civilian_1_c.vox",
+      "category": "character",
+      "format": "vox",
+      "source": "MagicaVoxel .vox (merged rest pose, editable)",
+      "height": 1.7200000000000002
+    }
+  ]
 }
