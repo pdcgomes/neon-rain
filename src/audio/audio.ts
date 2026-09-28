@@ -23,9 +23,13 @@ type SoundId =
   | 'success'
   | 'fail'
   | 'horn'
-  | 'crash';
+  | 'crash'
+  | 'type';
 
 const HEAR = 55;
+const TYPE_GAP_MS = 50;
+/** Readout bleeps hop between root, 2nd, 4th and 5th rather than drifting randomly. */
+const TYPE_STEPS = [1, 1.122, 1.335, 1.498];
 
 export class AudioSystem {
   private sounds = new Map<SoundId, Howl>();
@@ -35,8 +39,9 @@ export class AudioSystem {
   private ready = false;
   private combatLevel = 0;
   private slow = false;
+  private lastType = 0;
 
-  /** Must be called from a user gesture so browsers allow audio. */
+  /** Safe before a user gesture: Howler resumes the audio context on the first interaction. */
   init(): void {
     if (this.ready) return;
     this.ready = true;
@@ -61,6 +66,7 @@ export class AudioSystem {
     this.sounds.set('fail', mk(synth.chime([293.66, 277.18, 220, 146.83], 0.22, 0.9), { volume: 0.55 }));
     this.sounds.set('horn', mk(synth.horn(), { volume: 0.4, pool: 6 }));
     this.sounds.set('crash', mk(synth.carCrash(), { volume: 0.7, pool: 6 }));
+    this.sounds.set('type', mk(synth.dataTick(), { volume: 0.3, pool: 12 }));
     this.rain = mk(synth.rainLoop(), { volume: 0, loop: true, pool: 1 });
     this.pad = mk(synth.padLoop(), { volume: 0, loop: true, pool: 1 });
     this.combat = mk(synth.combatLoop(), { volume: 0, loop: true, pool: 1 });
@@ -68,6 +74,17 @@ export class AudioSystem {
 
   ui(): void {
     this.play('click');
+  }
+
+  /** Before the first user gesture Howler queues plays until unlock, which would dump every tick at once. */
+  typeChar(text: string): void {
+    if (!this.ready || !/\S/.test(text) || navigator.userActivation?.hasBeenActive === false) return;
+    const now = performance.now();
+    if (now - this.lastType < TYPE_GAP_MS) return;
+    this.lastType = now;
+    const stop = /[.,:;!?]/.test(text);
+    const rate = stop ? 0.891 : TYPE_STEPS[Math.floor(Math.random() * TYPE_STEPS.length)];
+    this.play('type', stop ? 1 : 0.75 + Math.random() * 0.25, (Math.random() - 0.5) * 0.2, rate);
   }
 
   private play(id: SoundId, vol = 1, pan = 0, rate = 1): void {

@@ -186,6 +186,20 @@ export function click(): string {
   return wav([normalize(a, 0.4)]);
 }
 
+/** Briefing readout bleep, Esper-terminal style: a pure sine chirp with a bright, sparse room tail. */
+export function dataTick(): string {
+  let ph = 0;
+  const a = render(0.1, (t) => {
+    ph += (2 * Math.PI * 3100 * (1 + 0.04 * Math.exp(-t / 0.005))) / SR;
+    return (Math.sin(ph) + 0.15 * Math.sin(ph * 2)) * env(t, 0.001, 0.016);
+  });
+  const d1 = Math.floor(SR * 0.031);
+  const d2 = Math.floor(SR * 0.053);
+  for (let i = a.length - 1; i >= d2; i--) a[i] += a[i - d1] * 0.22 + a[i - d2] * 0.1;
+  highpass(a, 1200);
+  return wav([normalize(a, 0.5)]);
+}
+
 /** Rain bed: stereo filtered noise, loops seamlessly because it has no structure. */
 export function rainLoop(): string {
   const L = render(6, (_t, _i, r) => r() * 2 - 1, 21);

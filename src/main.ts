@@ -63,7 +63,8 @@ async function deploy(): Promise<void> {
 
 function briefing(): void {
   void preloadAgentArt();
-  showBriefing(content.mission, loadSave(), () => void deploy());
+  audio.init();
+  showBriefing(content.mission, loadSave(), () => void deploy(), (ch) => audio.typeChar(ch));
 }
 
 function debrief(r: GameResult): void {

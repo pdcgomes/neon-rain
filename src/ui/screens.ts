@@ -33,7 +33,7 @@ function memorial(fallen: FallenAgent[], highlight: Set<string>): string {
     .join('')}</div>`;
 }
 
-export function showBriefing(mission: MissionDef, save: Save, onDeploy: () => void): void {
+export function showBriefing(mission: MissionDef, save: Save, onDeploy: () => void, onChar: (ch: string) => void): void {
   const squad = save.roster
     .slice(0, 4)
     .map(
@@ -85,8 +85,13 @@ export function showBriefing(mission: MissionDef, save: Save, onDeploy: () => vo
   const paras = mission.briefing;
   let p = 0;
   let c = 0;
+  let wait = 0;
   let current: HTMLParagraphElement | null = null;
   const timer = window.setInterval(() => {
+    if (wait > 0) {
+      wait--;
+      return;
+    }
     if (p >= paras.length) {
       window.clearInterval(timer);
       return;
@@ -95,14 +100,17 @@ export function showBriefing(mission: MissionDef, save: Save, onDeploy: () => vo
       current = document.createElement('p');
       box.appendChild(current);
     }
-    c += 3;
+    const chunk = paras[p].slice(c, c + 2);
+    c += chunk.length;
     current.textContent = paras[p].slice(0, c);
+    onChar(chunk);
     if (c >= paras[p].length) {
       p++;
       c = 0;
       current = null;
-    }
-  }, 12);
+      wait = 14;
+    } else if (/[.!?]/.test(chunk)) wait = 5;
+  }, 15);
 
   const go = () => {
     window.clearInterval(timer);
