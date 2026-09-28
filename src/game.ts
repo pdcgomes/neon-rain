@@ -118,6 +118,7 @@ export class Game {
       const t = this.view.rig.target;
       this.hud.update(this.fpsAvg, this.view.renderScale, { yaw: this.view.rig.yawAngle, x: t.x, z: t.z });
     }
+    this.audio?.setRain(this.view.rainLevel);
     this.audio?.frame(world, this.view.rig.target, this.view.rig.yawAngle);
   }
 

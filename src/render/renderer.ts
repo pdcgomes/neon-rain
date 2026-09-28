@@ -5,9 +5,10 @@ import { Actors } from './actors.ts';
 import { AgentModels } from './agentModels.ts';
 import { TrafficLights, Vehicles } from './vehicles.ts';
 import { CameraRig } from './camera.ts';
-import { City } from './cityBuilder.ts';
+import { type BuildingBox, City } from './cityBuilder.ts';
 import { Fx } from './fx.ts';
 import { PostFX } from './postfx.ts';
+import { type Palette, paletteAt, RainTrack, resolveAtmosphere } from './atmosphere.ts';
 import { Rain } from './weather.ts';
 
 export interface ViewState {
@@ -17,23 +18,27 @@ export interface ViewState {
   overdrive: boolean;
 }
 
-const FOG = 0x0a0918;
-
-export function neonEnvironment(renderer: THREE.WebGLRenderer): THREE.Texture {
+export function neonEnvironment(renderer: THREE.WebGLRenderer, sky: Pick<Palette, 'skyLow' | 'skyHigh' | 'horizon'> = paletteAt(22)): THREE.Texture {
   const scene = new THREE.Scene();
-  const sky = new THREE.Mesh(
+  // Palette sky colours are authored as raw values written straight into the (linear) env map.
+  const raw = (c: THREE.Color) => {
+    const o = c.getRGB({ r: 0, g: 0, b: 0 }, THREE.SRGBColorSpace);
+    return new THREE.Vector3(o.r, o.g, o.b);
+  };
+  const dome = new THREE.Mesh(
     new THREE.SphereGeometry(50, 32, 16),
     new THREE.ShaderMaterial({
       side: THREE.BackSide,
+      uniforms: { uLow: { value: raw(sky.skyLow) }, uHigh: { value: raw(sky.skyHigh) }, uHorizon: { value: raw(sky.horizon) } },
       vertexShader: /* glsl */ `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: /* glsl */ `varying vec3 vP; void main(){
+      fragmentShader: /* glsl */ `uniform vec3 uLow; uniform vec3 uHigh; uniform vec3 uHorizon; varying vec3 vP; void main(){
         float h = normalize(vP).y;
-        vec3 c = mix(vec3(0.05,0.03,0.09), vec3(0.08,0.07,0.2), smoothstep(-0.2,0.6,h));
-        c += vec3(0.35,0.08,0.3) * smoothstep(0.25,0.0,abs(h-0.05));
+        vec3 c = mix(uLow, uHigh, smoothstep(-0.2,0.6,h));
+        c += uHorizon * smoothstep(0.25,0.0,abs(h-0.05));
         gl_FragColor = vec4(c,1.0); }`,
     }),
   );
-  scene.add(sky);
+  scene.add(dome);
   const panel = (color: THREE.ColorRepresentation, x: number, y: number, z: number, w: number, h: number) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }));
     m.position.set(x, y, z);
@@ -63,6 +68,11 @@ export class GameRenderer {
   private rain = new Rain();
   private post: PostFX;
   private moon: THREE.DirectionalLight;
+  private palette: Palette;
+  private rainTrack: RainTrack;
+  private wetness = 0;
+  /** Current rain intensity, 0 dry .. 1 heavy. */
+  rainLevel = 0;
   private squadLight = new THREE.PointLight(0xc4dcff, 45, 18, 1.6);
   private canvas: HTMLCanvasElement;
   private world: World;
@@ -72,8 +82,8 @@ export class GameRenderer {
   private occRay = new THREE.Ray();
   private occHit = new THREE.Vector3();
   private occDir = new THREE.Vector3();
-  private occPts: THREE.Vector3[] = Array.from({ length: 16 }, () => new THREE.Vector3());
-  private occMargins = new Float32Array(16);
+  private occPts: THREE.Vector3[] = Array.from({ length: 24 }, () => new THREE.Vector3());
+  private occMargins = new Float32Array(24);
 
   constructor(canvas: HTMLCanvasElement, world: World) {
     this.canvas = canvas;
@@ -81,15 +91,19 @@ export class GameRenderer {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.setClearColor(FOG);
+    const mission = world.content.mission;
+    const atmo = resolveAtmosphere(mission.atmosphere);
+    const pal = (this.palette = paletteAt(atmo.hour));
+    this.rainTrack = new RainTrack(mission.seed, atmo.rain, atmo.fixedRain);
+    this.renderer.setClearColor(pal.fog);
 
-    this.scene.fog = new THREE.FogExp2(FOG, 0.0105);
-    this.scene.background = new THREE.Color(FOG);
-    this.scene.environment = neonEnvironment(this.renderer);
-    this.scene.environmentIntensity = 0.9;
+    this.scene.fog = new THREE.FogExp2(pal.fog, pal.fogDensity);
+    this.scene.background = pal.fog.clone();
+    this.scene.environment = neonEnvironment(this.renderer, pal);
+    this.scene.environmentIntensity = pal.envIntensity;
 
-    this.scene.add(new THREE.HemisphereLight(0x5a5fb0, 0x120818, 0.9));
-    this.moon = new THREE.DirectionalLight(0x9fb4ff, 1.1);
+    this.scene.add(new THREE.HemisphereLight(pal.hemiSky, pal.hemiGround, pal.hemi));
+    this.moon = new THREE.DirectionalLight(pal.key, pal.keyIntensity);
     this.moon.castShadow = true;
     this.moon.shadow.mapSize.set(2048, 2048);
     const sc = this.moon.shadow.camera;
@@ -102,17 +116,21 @@ export class GameRenderer {
     this.moon.shadow.bias = -0.0006;
     this.moon.shadow.normalBias = 0.04;
     this.scene.add(this.moon, this.moon.target);
-    const rim = new THREE.DirectionalLight(0xff4fb8, 0.35);
+    const rim = new THREE.DirectionalLight(pal.rim, pal.rimIntensity);
     rim.position.set(-60, 40, -30);
     this.scene.add(rim, this.squadLight);
 
     this.rig = new CameraRig(1, { w: world.map.w, h: world.map.h });
     this.city = new City(world.map);
+    this.city.setLighting(pal.windows, pal.lamps);
+    this.rainLevel = this.rainTrack.at(0);
+    this.wetness = Math.max(this.rainLevel, 0.6);
     this.fx = new Fx(this.scene, world);
     this.lights = new TrafficLights(world);
     this.scene.add(this.city.group, this.actors.group, this.agentModels.group, this.vehicles.group, this.lights.group, this.fx.group, this.rain.group);
 
     this.post = new PostFX(this.renderer, this.scene, this.rig.camera);
+    this.post.setGrade(pal.bloom, pal.bloomThreshold);
     this.resize();
     window.addEventListener('resize', () => this.resize(), { signal: this.abort.signal });
 
@@ -200,7 +218,7 @@ export class GameRenderer {
     const box = this.occBox;
     const ray = this.occRay;
     const hit = this.occHit;
-    for (const b of this.city.boxes) {
+    const fade = (b: BuildingBox) => {
       let occludes = false;
       for (let i = 0; i < n && !occludes; i++) {
         const m = margins[i];
@@ -213,7 +231,13 @@ export class GameRenderer {
       }
       if (occludes) b.holdUntil = time + 0.6;
       b.target = occludes || time < b.holdUntil ? 0 : 1;
-    }
+    };
+    for (const b of this.city.boxes) fade(b);
+    // Backdrop towers must also keep the middle of the screen clear, not just the squad.
+    const t = this.rig.target;
+    const r = cam.distanceTo(t) * 0.35;
+    for (let k = 0; k < 8; k++) add(t.x + Math.cos((k * Math.PI) / 4) * r, 0.5, t.z + Math.sin((k * Math.PI) / 4) * r, 1);
+    for (const b of this.city.skyline) fade(b);
   }
 
   render(alpha: number, dt: number, time: number, view: ViewState): void {
@@ -234,7 +258,8 @@ export class GameRenderer {
     this.rig.update(dt, time);
 
     const t = this.rig.target;
-    this.moon.position.set(t.x + 40, 90, t.z + 25);
+    const e = this.palette.keyElevation;
+    this.moon.position.set(t.x + 84.8 * Math.cos(e), 100 * Math.sin(e), t.z + 53 * Math.cos(e));
     this.moon.target.position.copy(t);
 
     this.updateOcclusion(view, time);
@@ -250,10 +275,20 @@ export class GameRenderer {
     this.vehicles.update(world, alpha, time);
     this.lights.update(world);
     this.fx.update(world, alpha, dt, time, view);
+    this.updateWeather(time, dt);
     this.rainTime += dt * (view.overdrive ? 0.3 : 1);
     this.rain.update(this.rainTime, t, this.rig.camera.position);
     this.post.setOverdrive(view.overdrive ? 1 : 0);
     this.post.render(dt, time);
+  }
+
+  /** Rain drifts over time; streets soak quickly and dry slowly, so they stay slick after a shower. */
+  private updateWeather(time: number, dt: number): void {
+    const level = (this.rainLevel = this.rainTrack.at(time));
+    this.wetness += (level - this.wetness) * Math.min(1, dt / (level > this.wetness ? 6 : 70));
+    this.city.setWetness(Math.max(0.25, this.wetness));
+    this.rain.setLook(level, this.palette.rain);
+    (this.scene.fog as THREE.FogExp2).density = this.palette.fogDensity * (1 + 0.3 * level);
   }
 
   dispose(): void {

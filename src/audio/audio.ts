@@ -38,6 +38,8 @@ export class AudioSystem {
   private combat: Howl | null = null;
   private ready = false;
   private combatLevel = 0;
+  private rainGain = 0;
+  private rainLevel = 0.5;
   private slow = false;
   private lastType = 0;
 
@@ -179,6 +181,8 @@ export class AudioSystem {
       this.slow = slow;
       for (const l of [this.rain, this.pad, this.combat]) l?.rate(slow ? 0.72 : 1);
     }
+    this.rainGain += (0.04 + 0.6 * this.rainLevel - this.rainGain) * 0.02;
+    this.rain?.volume(this.rainGain);
     const hot = world.alarm || world.policeHostile ? 1 : 0;
     this.combatLevel += (hot - this.combatLevel) * 0.01;
     this.combat?.volume(this.combatLevel * 0.45);
@@ -186,8 +190,9 @@ export class AudioSystem {
 
   startMission(): void {
     if (!this.ready) return;
+    if (this.rain && !this.rain.playing()) this.rain.play();
+    this.rainGain = 0;
     for (const [l, v] of [
-      [this.rain, 0.5],
       [this.pad, 0.5],
       [this.combat, 0],
     ] as const) {
@@ -196,6 +201,11 @@ export class AudioSystem {
       l.fade(l.volume(), v, 1500);
     }
     this.combatLevel = 0;
+  }
+
+  /** Rain intensity, 0 dry .. 1 heavy; the rain bed follows it smoothly. */
+  setRain(level: number): void {
+    this.rainLevel = level;
   }
 
   endMission(success: boolean): void {

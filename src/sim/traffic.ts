@@ -50,8 +50,6 @@ export interface Vehicle {
 }
 
 const LANE = 1.05;
-/** Where a car's centre stops so its nose stays behind the crosswalk (road half-width + crosswalk + margin + half length). */
-const STOP_LINE = 4 + 2 + 0.4 + 3.9 / 2;
 const CAR_LEN = 3.9;
 const CAR_WID = 1.85;
 const ACCEL = 5;
@@ -62,8 +60,8 @@ const APPROACH_SPEED = 6.5;
 export const SIGNAL_CYCLE = 28;
 const SIGNAL_GREEN = 12;
 const SIGNAL_CLEAR = 2;
-/** Pedestrians only start crossing if the red they are relying on lasts at least this long. */
-const WALK_TIME = 7;
+/** Pedestrians only start crossing if the red they are relying on lasts this long per metre of road. */
+const WALK_TIME_PER_M = 7 / 8;
 
 /** How far ahead (seconds) drivers anticipate where people crossing will be. */
 const ANTICIPATE = [0, 0.7, 1.4];
@@ -98,9 +96,17 @@ export class Traffic {
   private target: number;
   private w: number;
   private h: number;
+  /** Where a car's centre stops so its nose stays behind the crosswalk (road half-width + crosswalk + margin + half length). */
+  private stopLine: number;
+  private halfRoad: number;
+  private walkTime: number;
 
   constructor(world: World, count: number) {
     const { map } = world;
+    const road = map.roadsX.length ? map.roadsX[0].end - map.roadsX[0].start : 8;
+    this.halfRoad = road / 2;
+    this.stopLine = this.halfRoad + 2 + 0.4 + CAR_LEN / 2;
+    this.walkTime = road * WALK_TIME_PER_M;
     this.xs = map.roadsX.map((r) => (r.start + r.end) / 2);
     this.ys = map.roadsY.map((r) => (r.start + r.end) / 2);
     this.occupancy = Array.from({ length: this.xs.length * this.ys.length }, () => []);
@@ -162,7 +168,7 @@ export class Traffic {
   private routeToNext(v: Vehicle, fromX: number, fromY: number): void {
     if (this.inRange(v.ni, v.nj)) {
       const n = this.node(v.ni, v.nj);
-      v.route.push(this.lane(n.x, n.y, v.hx, v.hy, -STOP_LINE));
+      v.route.push(this.lane(n.x, n.y, v.hx, v.hy, -this.stopLine));
       v.exitsMap = false;
     } else {
       v.route.push({
@@ -182,7 +188,7 @@ export class Traffic {
     const hx = vertical ? 0 : dir;
     const hy = vertical ? dir : 0;
     const n = this.node(i, j);
-    const back = rng.range(STOP_LINE + 1, 14);
+    const back = rng.range(this.stopLine + 1, this.halfRoad + 10);
     const at = this.lane(n.x, n.y, hx, hy, -back);
     if (at.x < 3 || at.y < 3 || at.x > this.w - 3 || at.y > this.h - 3) return;
     if (this.vehicles.some((o) => Math.hypot(o.x - at.x, o.y - at.y) < 7)) return;
@@ -244,7 +250,7 @@ export class Traffic {
     const hx = v.nextHx;
     const hy = v.nextHy;
     v.planned = false;
-    const exit = this.lane(n.x, n.y, hx, hy, STOP_LINE);
+    const exit = this.lane(n.x, n.y, hx, hy, this.stopLine);
     if (hx !== v.hx || hy !== v.hy) {
       const a = { x: v.x, y: v.y };
       const c = { x: n.x - v.hy * LANE - hy * LANE, y: n.y + v.hx * LANE + hx * LANE };
@@ -284,7 +290,7 @@ export class Traffic {
       const ry = o.y - start.y;
       const along = rx * hx + ry * hy;
       const lat = Math.abs(-rx * hy + ry * hx);
-      if (lat < 1.2 && along > STOP_LINE - CAR_LEN && along < STOP_LINE + CAR_LEN + 1.5) return false;
+      if (lat < 1.2 && along > this.stopLine - CAR_LEN && along < this.stopLine + CAR_LEN + 1.5) return false;
     }
     return true;
   }
@@ -318,7 +324,7 @@ export class Traffic {
 
   /** Walk signal for a crosswalk: the road being crossed must be red for long enough to get across. */
   canCross(node: number, trafficAxis: number, time: number): boolean {
-    return this.redRemaining(node, trafficAxis, time) >= WALK_TIME;
+    return this.redRemaining(node, trafficAxis, time) >= this.walkTime;
   }
 
   get nodeCount(): number {

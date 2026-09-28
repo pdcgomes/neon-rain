@@ -32,6 +32,7 @@ export class PostFX {
   private width = 1;
   private height = 1;
   private overdrive = 0;
+  private bloomBase = 1.45;
 
   private dynamic: boolean;
 
@@ -82,12 +83,18 @@ export class PostFX {
     this.composer.setSize(this.width, this.height, false);
   }
 
+  /** Time-of-day grade: brighter scenes need less bloom and a higher threshold to keep neon reading. */
+  setGrade(bloom: number, threshold: number): void {
+    this.bloomBase = bloom;
+    this.bloom.luminanceMaterial.threshold = threshold;
+  }
+
   setOverdrive(v: number): void {
     this.overdrive += (v - this.overdrive) * 0.15;
     const k = 1 + this.overdrive * 5;
     this.chroma.offset.set(0.0008 * k, 0.0005 * k);
     this.vignette.darkness = 0.62 + this.overdrive * 0.3;
-    this.bloom.intensity = 1.45 + this.overdrive * 0.6;
+    this.bloom.intensity = this.bloomBase + this.overdrive * 0.6;
   }
 
   render(dt: number, now: number): void {

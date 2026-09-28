@@ -4,10 +4,16 @@
   "city": "Neo-Lisboa // Sector 7",
   "seed": 7717,
   "map": {
-    "size": 120,
+    "size": 136,
     "blockMin": 20,
     "blockMax": 28,
-    "roadWidth": 8
+    "roadWidth": 12,
+    "sidewalk": 3,
+    "openLots": 0.15
+  },
+  "atmosphere": {
+    "hour": 22,
+    "rain": { "min": 0, "max": 1 }
   },
   "briefing": [
     "Good evening, Agents. Eurocorp thanks you for your continued ownership.",

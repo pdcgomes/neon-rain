@@ -28,6 +28,14 @@ export interface AgentDef {
   grenades: number;
 }
 
+/** When and in what weather a mission takes place. */
+export interface AtmosphereDef {
+  /** Local time, 0..24 (default 22). */
+  hour?: number;
+  /** Rain intensity range the weather drifts within, 0 dry .. 1 heavy. */
+  rain?: { min?: number; max?: number };
+}
+
 export interface MissionDef {
   id: string;
   codename: string;
@@ -49,6 +57,7 @@ export interface MissionDef {
   };
   policeHostileAt: number;
   enforcersAt: number;
+  atmosphere?: AtmosphereDef;
 }
 
 export interface Content {

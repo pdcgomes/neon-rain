@@ -29,6 +29,7 @@ varying vec3 vSize;
 
 const BUILDING_FRAG_HEAD = /* glsl */ `
 uniform float uTime;
+uniform float uWindows;
 varying vec3 vBPos;
 varying vec3 vBNormal;
 flat varying float vSeed;
@@ -46,10 +47,15 @@ float bayer4(vec2 p) {
 }
 `;
 
-export function buildingMaterial(uniforms: { uTime: { value: number } }): THREE.MeshStandardMaterial {
+export function buildingMaterial(
+  uniforms: { uTime: { value: number }; uWindows?: { value: number } },
+  ghostEdges = true,
+): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.62, metalness: 0.15, envMapIntensity: 0.35 });
+  mat.customProgramCacheKey = () => (ghostEdges ? 'building' : 'building-noedge');
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = uniforms.uTime;
+    shader.uniforms.uWindows = uniforms.uWindows ?? { value: 1 };
     shader.vertexShader = BUILDING_VERT_HEAD + shader.vertexShader.replace(
       '#include <begin_vertex>',
       /* glsl */ `#include <begin_vertex>
@@ -71,7 +77,7 @@ export function buildingMaterial(uniforms: { uTime: { value: number } }): THREE.
           float bMn = min(bD.x, min(bD.y, bD.z));
           float bMx = max(bD.x, max(bD.y, bD.z));
           float bMid = bD.x + bD.y + bD.z - bMn - bMx;
-          bEdge = 1.0 - step(0.09, bMid);
+          bEdge = ${ghostEdges ? '1.0 - step(0.09, bMid)' : '0.0'};
           if (bEdge < 0.5 && bayer4(gl_FragCoord.xy) > vFade * 0.9) discard;
         }`,
       )
@@ -107,7 +113,7 @@ export function buildingMaterial(uniforms: { uTime: { value: number } }): THREE.
         '#include <emissivemap_fragment>',
         /* glsl */ `#include <emissivemap_fragment>
         float bH = bHash(bId + vec2(vSeed * 0.0137, bn.x * 3.0 + bn.z * 7.0));
-        float bLit = mix(step(0.7, bH), 0.3, bLod);
+        float bLit = mix(step(1.0 - 0.3 * uWindows, bH), 0.3 * uWindows, bLod);
         vec3 bWarm = vec3(1.0, 0.62, 0.34);
         vec3 bCool = vec3(0.45, 0.75, 1.0);
         vec3 bPink = vec3(1.0, 0.32, 0.72);
@@ -137,8 +143,14 @@ export function buildingMaterial(uniforms: { uTime: { value: number } }): THREE.
 export class City {
   readonly group = new THREE.Group();
   readonly boxes: BuildingBox[] = [];
-  private uniforms = { uTime: { value: 0 } };
+  private uniforms = { uTime: { value: 0 }, uWindows: { value: 1 } };
+  private groundMat!: THREE.MeshStandardMaterial;
+  private lampHeads!: THREE.MeshBasicMaterial;
+  private lampPools!: THREE.MeshBasicMaterial;
   private fadeAttr!: THREE.InstancedBufferAttribute;
+  /** Backdrop towers ringing the map; they fade out entirely when they would hide the play area. */
+  readonly skyline: BuildingBox[] = [];
+  private skylineFade!: THREE.InstancedBufferAttribute;
   private flickers: { mat: THREE.MeshBasicMaterial; base: number; seed: number }[] = [];
   private beacons!: THREE.InstancedMesh;
   private roof!: THREE.InstancedMesh;
@@ -174,6 +186,7 @@ export class City {
       metalness: 0.15,
       envMapIntensity: 1.6,
     });
+    this.groundMat = mat;
     const ground = new THREE.Mesh(geo, mat);
     ground.receiveShadow = true;
     this.group.add(ground);
@@ -186,34 +199,46 @@ export class City {
     apron.position.set(this.map.w / 2, -0.02, this.map.h / 2);
     this.group.add(apron);
 
-    // Silhouette skyline ring outside the playable area.
+    // Silhouette skyline ring outside the playable area, stepping down towards the map edge.
+    const count = 160;
     const ring = new THREE.InstancedMesh(
       new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0),
-      buildingMaterial(this.uniforms),
-      160,
+      buildingMaterial(this.uniforms, false),
+      count,
     );
-    const seeds = new Float32Array(160);
-    const fades = new Float32Array(160).fill(1);
-    const tints = new Float32Array(160 * 3);
+    const seeds = new Float32Array(count);
+    const fades = new Float32Array(count).fill(1);
+    const tints = new Float32Array(count * 3);
     const m = new THREE.Matrix4();
     const cx = this.map.w / 2;
     const cz = this.map.h / 2;
-    for (let i = 0; i < 160; i++) {
-      const a = (i / 160) * Math.PI * 2;
-      const r = this.map.w * (0.62 + hash2(i, 1) * 0.35);
-      const h = 30 + hash2(i, 2) * 90;
+    const half = Math.max(cx, cz);
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
       const s = 8 + hash2(i, 3) * 14;
-      m.compose(
-        new THREE.Vector3(cx + Math.cos(a) * r, 0, cz + Math.sin(a) * r),
-        new THREE.Quaternion(),
-        new THREE.Vector3(s, h, s),
-      );
+      // Distance from the map centre to its square edge along this bearing, then clear of it.
+      const edge = half / Math.max(Math.abs(Math.cos(a)), Math.abs(Math.sin(a)));
+      const gap = 10 + s * 0.71 + hash2(i, 1) * 40;
+      const h = Math.min(30 + hash2(i, 2) * 90, 20 + 1.8 * (gap - s * 0.71));
+      const x = cx + Math.cos(a) * (edge + gap);
+      const z = cz + Math.sin(a) * (edge + gap);
+      m.compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion(), new THREE.Vector3(s, h, s));
       ring.setMatrixAt(i, m);
       seeds[i] = (i * 17) % 997;
       tints.set([0.07, 0.075, 0.1], i * 3);
+      this.skyline.push({
+        min: new THREE.Vector3(x - s / 2, 0, z - s / 2),
+        max: new THREE.Vector3(x + s / 2, h, z + s / 2),
+        fade: 1,
+        target: 1,
+        holdUntil: 0,
+        hidden: false,
+      });
     }
     ring.geometry.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 1));
-    ring.geometry.setAttribute('aFade', new THREE.InstancedBufferAttribute(fades, 1));
+    this.skylineFade = new THREE.InstancedBufferAttribute(fades, 1);
+    this.skylineFade.setUsage(THREE.DynamicDrawUsage);
+    ring.geometry.setAttribute('aFade', this.skylineFade);
     ring.geometry.setAttribute('aTint', new THREE.InstancedBufferAttribute(tints, 3));
     this.group.add(ring);
   }
@@ -372,11 +397,12 @@ export class City {
       }
     }
 
-    // Lamp light pools.
+    // Lamp light pools, drawn separately so they can dim by day.
+    const pools: typeof glows = [];
     for (const p of this.map.props) {
       if (p.kind !== 'lamp') continue;
       const warm = hash2(p.x, p.y, 2) > 0.4;
-      glows.push({
+      pools.push({
         x: p.x + 0.5,
         z: p.y + 0.5,
         s: 9,
@@ -384,25 +410,31 @@ export class City {
       });
     }
 
-    const glowMesh = new THREE.InstancedMesh(
-      glowGeo,
-      new THREE.MeshBasicMaterial({
-        map: glowTex,
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        toneMapped: false,
-      }),
-      glows.length,
-    );
-    const m = new THREE.Matrix4();
-    glows.forEach((g, i) => {
-      m.compose(new THREE.Vector3(g.x, 0.03, g.z), new THREE.Quaternion(), new THREE.Vector3(g.s, 1, g.s));
-      glowMesh.setMatrixAt(i, m);
-      glowMesh.setColorAt(i, g.c);
-    });
-    glowMesh.renderOrder = 1;
-    this.group.add(glowMesh);
+    const glowMesh = (list: typeof glows) => {
+      const mesh = new THREE.InstancedMesh(
+        glowGeo,
+        new THREE.MeshBasicMaterial({
+          map: glowTex,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          toneMapped: false,
+        }),
+        Math.max(1, list.length),
+      );
+      mesh.count = list.length;
+      const m = new THREE.Matrix4();
+      list.forEach((g, i) => {
+        m.compose(new THREE.Vector3(g.x, 0.03, g.z), new THREE.Quaternion(), new THREE.Vector3(g.s, 1, g.s));
+        mesh.setMatrixAt(i, m);
+        mesh.setColorAt(i, g.c);
+      });
+      mesh.renderOrder = 1;
+      this.group.add(mesh);
+      return mesh.material;
+    };
+    glowMesh(glows);
+    this.lampPools = glowMesh(pools);
   }
 
   private buildProps(props: Prop[]): void {
@@ -418,11 +450,8 @@ export class City {
       new THREE.MeshStandardMaterial({ color: 0x22232a, metalness: 0.8, roughness: 0.4 }),
       lamps.length,
     );
-    const head = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(0.9, 0.12, 0.3),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }),
-      lamps.length,
-    );
+    this.lampHeads = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
+    const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.9, 0.12, 0.3), this.lampHeads, lamps.length);
     lamps.forEach((p, i) => {
       pole.setMatrixAt(i, m.makeTranslation(p.x + 0.5, 0, p.y + 0.5));
       head.setMatrixAt(i, m.makeTranslation(p.x + 0.5, 5, p.y + 0.5));
@@ -524,6 +553,34 @@ export class City {
     });
     this.group.add(bench);
 
+    // Planters: low concrete boxes with a lit rim and a shrub.
+    const planters = by('planter');
+    const pbox = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.95, 0.55, 0.95).translate(0, 0.275, 0),
+      new THREE.MeshStandardMaterial({ color: 0x22242d, roughness: 0.8 }),
+      Math.max(1, planters.length),
+    );
+    const prim = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1.0, 0.05, 1.0).translate(0, 0.56, 0),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(0.2, 1.6, 1.9), toneMapped: false }),
+      Math.max(1, planters.length),
+    );
+    const shrub = new THREE.InstancedMesh(
+      new THREE.IcosahedronGeometry(0.42, 0),
+      new THREE.MeshStandardMaterial({ color: 0x1b2a22, roughness: 0.9, flatShading: true }),
+      Math.max(1, planters.length),
+    );
+    pbox.count = prim.count = shrub.count = planters.length;
+    planters.forEach((p, i) => {
+      m.makeTranslation(p.x + 0.5, 0, p.y + 0.5);
+      pbox.setMatrixAt(i, m);
+      prim.setMatrixAt(i, m);
+      q.setFromAxisAngle(up, hash2(p.seed, 5) * 6.28);
+      shrub.setMatrixAt(i, m.compose(new THREE.Vector3(p.x + 0.5, 0.8, p.y + 0.5), q, new THREE.Vector3(1, 0.8, 1)));
+    });
+    pbox.castShadow = shrub.castShadow = true;
+    this.group.add(pbox, prim, shrub);
+
     // Plaza fountain with a corporate hologram.
     for (const f of by('fountain')) {
       const cx = f.x + f.w / 2;
@@ -595,6 +652,20 @@ export class City {
     this.group.add(this.vtolBeam, this.vtolPad, this.escapeBeam, limo);
   }
 
+  /** Time of day: share of lit windows and street lamp brightness (both 0..1). */
+  setLighting(windows: number, lamps: number): void {
+    this.uniforms.uWindows.value = windows;
+    this.lampHeads.color.setScalar(0.25 + 0.75 * lamps);
+    this.lampPools.color.setScalar(lamps);
+    this.lampPools.visible = lamps > 0.02;
+  }
+
+  /** Street wetness, 0 (dry, matte) .. 1 (fresh rain, glossy puddles). */
+  setWetness(wet: number): void {
+    this.groundMat.roughness = 1 + (1 - wet) * 0.7;
+    this.groundMat.envMapIntensity = 1.6 * (0.45 + 0.55 * wet);
+  }
+
   setFade(i: number, v: number): void {
     this.fadeAttr.setX(i, v);
   }
@@ -642,5 +713,16 @@ export class City {
     if (roofDirty) this.roof.instanceMatrix.needsUpdate = true;
     if (beaconDirty) this.beacons.instanceMatrix.needsUpdate = true;
     if (dirty) this.fadeAttr.needsUpdate = true;
+
+    let skyDirty = false;
+    this.skyline.forEach((b, i) => {
+      let nf = b.fade + (b.target - b.fade) * (b.target < b.fade ? 0.3 : 0.12);
+      if (Math.abs(nf - b.target) < 0.02) nf = b.target;
+      if (nf === b.fade) return;
+      b.fade = nf;
+      this.skylineFade.setX(i, nf);
+      skyDirty = true;
+    });
+    if (skyDirty) this.skylineFade.needsUpdate = true;
   }
 }

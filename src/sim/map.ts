@@ -65,6 +65,10 @@ export interface MapParams {
   blockMin: number;
   blockMax: number;
   roadWidth: number;
+  /** Sidewalk width around each block, metres (default 2). */
+  sidewalk?: number;
+  /** Chance that a lot is left open (courtyard or car park) instead of built on. */
+  openLots?: number;
 }
 
 function makeBands(size: number, rng: Rng, p: MapParams): { roads: Band[]; blocks: Band[] } {
@@ -122,12 +126,15 @@ export function generateCity(seed: number, params: MapParams): CityMap {
     }
   }
 
-  const sidewalk = 2;
+  const sidewalk = params.sidewalk ?? 2;
+  const openLots = params.openLots ?? 0;
   let plaza = { x: 0, y: 0, w: 0, h: 0 };
 
   const addBuilding = (x: number, y: number, w: number, h: number) => {
-    const tall = rng.chance(0.1);
-    const height = tall ? rng.range(26, 40) : rng.range(6, 17) * (0.75 + 0.5 * Math.min(1, (w * h) / 100));
+    // Mostly low-rise so streets stay readable from the gameplay camera; rare towers on big lots only.
+    const area = Math.min(1, (w * h) / 100);
+    const tall = area > 0.6 && rng.chance(0.06);
+    const height = tall ? rng.range(22, 32) : rng.range(4, 10) * (0.85 + 0.35 * area);
     buildings.push({
       id: buildings.length,
       x,
@@ -142,9 +149,48 @@ export function generateCity(seed: number, params: MapParams): CityMap {
     setRect(blocked, x, y, w, h, 1);
   };
 
+  const openLot = (x: number, y: number, w: number, h: number) => {
+    setRect(ground, x, y, w, h, GROUND_PLAZA);
+    if (w >= 5 && h >= 5 && rng.chance(0.5)) {
+      // Car park: one row of parked cars along the longer side.
+      const along = w >= h;
+      const len = along ? w : h;
+      for (let k = 1; k + 2 <= len - 1; k += 3) {
+        if (!rng.chance(0.7)) continue;
+        const cx = along ? x + k : x + 1;
+        const cy = along ? y + 1 : y + k;
+        const cw = along ? 2 : 4;
+        const ch = along ? 4 : 2;
+        if (cx + cw > x + w || cy + ch > y + h) continue;
+        props.push({ kind: 'car', x: cx, y: cy, w: cw, h: ch, rot: along ? Math.PI / 2 : 0, seed: rng.int(1, 1e9) });
+        setRect(blocked, cx, cy, cw, ch, 1);
+      }
+      return;
+    }
+    // Courtyard: a few trees, planters and benches, keeping the edges walkable.
+    for (let ty = y + 1; ty < y + h - 1; ty += 3) {
+      for (let tx = x + 1; tx < x + w - 1; tx += 3) {
+        const r = rng.next();
+        if (r < 0.3) {
+          props.push({ kind: 'tree', x: tx, y: ty, w: 1, h: 1, rot: rng.range(0, 6.28), seed: rng.int(1, 1e9) });
+          blocked[ty * W + tx] = 1;
+        } else if (r < 0.42) {
+          props.push({ kind: 'planter', x: tx, y: ty, w: 1, h: 1, rot: 0, seed: rng.int(1, 1e9) });
+          blocked[ty * W + tx] = 1;
+        } else if (r < 0.55) {
+          props.push({ kind: 'bench', x: tx, y: ty, w: 1, h: 1, rot: rng.chance(0.5) ? 0 : Math.PI / 2, seed: 0 });
+        }
+      }
+    }
+  };
+
   const subdivide = (x: number, y: number, w: number, h: number, depth: number) => {
     const maxLot = 10;
     if ((w <= maxLot && h <= maxLot && (depth > 0 || rng.chance(0.5))) || w < 8 || h < 8) {
+      if (depth > 0 && rng.chance(openLots)) {
+        openLot(x, y, w, h);
+        return;
+      }
       if (rng.chance(0.07) && depth > 0) {
         setRect(ground, x, y, w, h, GROUND_ALLEY);
         if (w >= 3 && h >= 3 && rng.chance(0.6)) {
