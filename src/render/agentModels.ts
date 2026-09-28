@@ -30,50 +30,77 @@ interface Rig {
   weapons: Map<string, THREE.Object3D>;
 }
 
+export interface AgentArt {
+  base: LabAsset;
+  weapons: Map<string, { entry: ManifestEntry; object: THREE.Object3D }>;
+}
+
+let artPromise: Promise<AgentArt | null> | null = null;
+let art: AgentArt | null = null;
+const progress = { done: 0, total: 1 };
+
+/**
+ * Loads the imported agent and weapon art once per page; later calls reuse it. Resolves to null
+ * with ?art=classic or if the assets can't be loaded, in which case agents stay procedural.
+ */
+export function preloadAgentArt(): Promise<AgentArt | null> {
+  if (artPromise) return artPromise;
+  if (new URLSearchParams(location.search).get('art') === 'classic') {
+    progress.done = progress.total;
+    return (artPromise = Promise.resolve(null));
+  }
+  artPromise = (async () => {
+    await loadManifest();
+    const entry = importedEntries().find((e) => e.id === CHARACTER);
+    if (!entry) throw new Error(`${CHARACTER} missing from lab manifest`);
+    const ids = [...new Set(Object.values(WEAPON_ART))];
+    progress.total = 1 + ids.length;
+    const tick = <T>(p: Promise<T>) => p.then((v) => (progress.done++, v));
+    const [base, ...weapons] = await Promise.all([
+      tick(loadEntry(entry, { weapon: 'none' })),
+      ...ids.map((id) => {
+        const w = importedEntries().find((e) => e.id === id);
+        return tick(w ? loadEntry(w).then((a) => ({ entry: w, object: a.object })) : Promise.resolve(null));
+      }),
+    ]);
+    const loaded: AgentArt = { base, weapons: new Map() };
+    for (const w of weapons) if (w) loaded.weapons.set(w.entry.id, w);
+    return (art = loaded);
+  })().catch((err) => {
+    console.warn('Imported agent art unavailable, using procedural agents.', err);
+    progress.done = progress.total;
+    return null;
+  });
+  return artPromise;
+}
+
+/** Fraction of the agent art loaded so far, 0..1. */
+export function agentArtProgress(): number {
+  return progress.done / progress.total;
+}
+
 /**
  * Renders player agents with the imported Mixamo character and Tripo weapons from the lab
- * manifest. Until the assets have loaded (or with ?art=classic), `ids` is empty and the
- * procedural actors draw agents as before.
+ * manifest, if `preloadAgentArt` has finished; otherwise `ids` stays empty and the procedural
+ * actors draw agents as before.
  */
 export class AgentModels {
   readonly group = new THREE.Group();
   /** Entities currently drawn by this renderer; the procedural actors skip them. */
   readonly ids = new Set<number>();
-  private base: LabAsset | null = null;
-  private weaponArt = new Map<string, { entry: ManifestEntry; object: THREE.Object3D }>();
+  private art = art;
   private rigs = new Map<number, Rig>();
   private tmp = new THREE.Vector2();
 
-  constructor() {
-    if (new URLSearchParams(location.search).get('art') === 'classic') return;
-    this.load().catch((err) => console.warn('Imported agent art unavailable, using procedural agents.', err));
-  }
-
-  private async load(): Promise<void> {
-    await loadManifest();
-    const entry = importedEntries().find((e) => e.id === CHARACTER);
-    if (!entry) throw new Error(`${CHARACTER} missing from lab manifest`);
-    const ids = [...new Set(Object.values(WEAPON_ART))];
-    const [base, ...weapons] = await Promise.all([
-      loadEntry(entry, { weapon: 'none' }),
-      ...ids.map((id) => {
-        const w = importedEntries().find((e) => e.id === id);
-        return w ? loadEntry(w).then((a) => ({ entry: w, object: a.object })) : Promise.resolve(null);
-      }),
-    ]);
-    for (const w of weapons) if (w) this.weaponArt.set(w.entry.id, w);
-    this.base = base;
-  }
-
   private spawn(e: Entity): Rig {
-    const base = this.base!;
+    const base = this.art!.base;
     const root = new THREE.Group();
     const body = SkeletonUtils.clone(base.object);
     body.scale.multiplyScalar(SCALE);
     root.add(body);
     const weapons = new Map<string, THREE.Object3D>();
     for (const wid of e.weapons) {
-      const art = this.weaponArt.get(WEAPON_ART[wid] ?? '');
+      const art = this.art!.weapons.get(WEAPON_ART[wid] ?? '');
       if (!art || weapons.has(wid)) continue;
       const item = art.object.clone(true);
       if (attachToHand(body, item, base.clips, { ...art.entry.hold, asset: art.entry.id })) {
@@ -116,7 +143,7 @@ export class AgentModels {
   }
 
   update(world: World, alpha: number, dt: number): void {
-    if (!this.base) return;
+    if (!this.art) return;
     const seen = new Set<number>();
     for (const e of world.entities) {
       if (e.kind !== 'agent' || e.faction !== 'player') continue;

@@ -117,6 +117,31 @@ export function showBriefing(mission: MissionDef, save: Save, onDeploy: () => vo
   d.querySelector('.deploy')!.addEventListener('click', go);
 }
 
+export interface LoadingScreen {
+  set(fraction: number, status: string): void;
+}
+
+export function showLoading(mission: MissionDef): LoadingScreen {
+  const d = screen(
+    'loading',
+    `${LOGO}
+    <div class="load-box">
+      <div class="brief-kicker">MISSION ${mission.id.split('_')[0]} · ${mission.city}</div>
+      <div class="load-title">DEPLOYING ${mission.codename}</div>
+      <div class="load-bar"><i></i></div>
+      <div class="load-status">Establishing uplink…</div>
+    </div>`,
+  );
+  const bar = d.querySelector<HTMLElement>('.load-bar i')!;
+  const status = d.querySelector<HTMLElement>('.load-status')!;
+  return {
+    set(fraction, text) {
+      bar.style.width = `${Math.round(Math.max(0, Math.min(1, fraction)) * 100)}%`;
+      status.textContent = text;
+    },
+  };
+}
+
 export function showPause(onResume: () => void, onRestart: () => void, onAbort: () => void): void {
   const d = screen(
     'pause',

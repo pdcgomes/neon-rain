@@ -120,6 +120,13 @@ export class GameRenderer {
     if (lead) this.rig.setFocus(lead.x, lead.y, true);
   }
 
+  /** Builds every agent rig, compiles all shaders and draws one frame so play starts without hitches. */
+  async warmup(): Promise<void> {
+    this.agentModels.update(this.world, 1, 0);
+    await this.renderer.compileAsync(this.scene, this.rig.camera);
+    this.render(0, 0, 0, { selected: new Set(), cursor: null, aiming: false, overdrive: false });
+  }
+
   get renderScale(): number {
     return this.post.scale;
   }

@@ -144,6 +144,8 @@ function applyAccent(obj: THREE.Object3D, accent: string): void {
   });
 }
 
+const GLOW_MAP_MAX = 1024;
+
 /** Builds an emissive map from the pixels of the base colour texture that match `hex` in hue. */
 function applyGlowKey(obj: THREE.Object3D, hex: string): void {
   const key = new THREE.Color(hex);
@@ -160,10 +162,11 @@ function applyGlowKey(obj: THREE.Object3D, hex: string): void {
       let em = done.get(s.map);
       if (!em) {
         const c = document.createElement('canvas');
-        c.width = img.width;
-        c.height = img.height;
+        const k = Math.min(1, GLOW_MAP_MAX / Math.max(img.width, img.height));
+        c.width = Math.round(img.width * k);
+        c.height = Math.round(img.height * k);
         const g = c.getContext('2d', { willReadFrequently: true })!;
-        g.drawImage(img, 0, 0);
+        g.drawImage(img, 0, 0, c.width, c.height);
         const data = g.getImageData(0, 0, c.width, c.height);
         const px = data.data;
         const col = new THREE.Color();
