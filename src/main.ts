@@ -1,8 +1,9 @@
 import './style.css';
 import { AudioSystem } from './audio/audio.ts';
-import { content } from './content/index.ts';
+import { DEFAULT_MISSION, listMissions, loadMission, makeContent } from './content/index.ts';
 import { Game, type GameResult } from './game.ts';
 import { agentArtProgress, preloadAgentArt } from './render/agentModels.ts';
+import type { Content } from './sim/content.ts';
 import { loadSave, recordMission, squadFromSave } from './ui/roster.ts';
 import { hideScreens, showBriefing, showDebrief, showLoading, showPause } from './ui/screens.ts';
 
@@ -11,6 +12,18 @@ const audio = new AudioSystem();
 const params = new URLSearchParams(location.search);
 let game: Game | null = null;
 let deploying = 0;
+const missions = await listMissions();
+let missionId = params.get('mission') ?? DEFAULT_MISSION;
+let content: Content = makeContent(await loadMission(missions, missionId));
+
+async function selectMission(id: string): Promise<void> {
+  missionId = id;
+  content = makeContent(await loadMission(missions, id));
+  const q = new URLSearchParams(location.search);
+  if (id === DEFAULT_MISSION) q.delete('mission');
+  else q.set('mission', id);
+  history.replaceState(null, '', `${location.pathname}${q.toString() ? `?${q}` : ''}`);
+}
 
 async function deploy(): Promise<void> {
   const my = ++deploying;
@@ -64,7 +77,11 @@ async function deploy(): Promise<void> {
 function briefing(): void {
   void preloadAgentArt();
   audio.init();
-  showBriefing(content.mission, loadSave(), () => void deploy(), (ch) => audio.typeChar(ch));
+  showBriefing(content.mission, loadSave(), () => void deploy(), (ch) => audio.typeChar(ch), {
+    list: missions.map((m) => ({ id: m.id, local: m.source === 'local' })),
+    current: missionId,
+    pick: (id) => void selectMission(id).then(briefing),
+  });
 }
 
 function debrief(r: GameResult): void {

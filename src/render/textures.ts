@@ -83,7 +83,11 @@ export function radialTexture(inner = 'rgba(255,255,255,1)', outer = 'rgba(255,2
 }
 
 /** Paints the whole city floor into one texture plus a wetness (roughness) map. */
-export function groundTextures(map: CityMap, px = 14): { color: THREE.CanvasTexture; rough: THREE.CanvasTexture } {
+export function groundTextures(
+  map: CityMap,
+  // Large authored maps get fewer pixels per cell so the canvas stays within texture limits.
+  px = Math.max(4, Math.min(14, Math.floor(4096 / Math.max(map.w, map.h)))),
+): { color: THREE.CanvasTexture; rough: THREE.CanvasTexture } {
   const W = map.w * px;
   const H = map.h * px;
   const [c, g] = canvas(W, H);

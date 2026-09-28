@@ -11,8 +11,11 @@
     "typecheck": "tsc --noEmit",
     "sim:smoke": "node scripts/sim-smoke.ts",
     "sim:traffic": "node scripts/traffic-check.ts",
+    "lab:e2e": "node scripts/lab-e2e.ts",
     "art:tripo": "NODE_USE_ENV_PROXY=1 node tools/art/tripo.ts",
-    "art:mixamo": "node tools/art/mixamo-pack.ts"
+    "art:mixamo": "node tools/art/mixamo-pack.ts",
+    "synd": "node tools/syndicate/cli.ts",
+    "synd:convert": "node tools/syndicate/cli.ts convert"
   },
   "dependencies": {
     "howler": "^2.2.4",

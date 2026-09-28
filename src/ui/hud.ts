@@ -1,4 +1,5 @@
 import type { Controls } from '../input/controls.ts';
+import { currentObjective, missionOver, targetCanEscape } from '../sim/systems/objectives.ts';
 import type { Entity, SimEvent } from '../sim/types.ts';
 import type { World } from '../sim/world.ts';
 import { Minimap } from './minimap.ts';
@@ -88,7 +89,7 @@ export class Hud {
     ].join('<br>');
 
     root.append(squad, top, mapWrap, this.weapons, this.log, this.banner, this.stats, this.overdrive, help);
-    this.announce(world.content.mission.objectives[0].text);
+    this.announce(currentObjective(world)?.text ?? world.content.mission.objectives[0]?.text ?? '');
   }
 
   private makeCard(a: Entity): HTMLDivElement {
@@ -173,7 +174,7 @@ export class Hud {
       else if (ev.t === 'objective') this.announce(ev.text);
       else if (ev.t === 'persuaded') {
         const e = this.world.get(ev.id);
-        if (e && e.kind === 'guard') this.chatter(`Bodyguard persuaded (${this.world.stats.guardsPersuaded}/${this.world.content.mission.population.guards}).`, 'hq');
+        if (e && e.kind === 'guard' && this.world.content.mission.bonus) this.chatter(`Bodyguard persuaded (${this.world.stats.guardsPersuaded}/${this.world.content.mission.population.guards}).`, 'hq');
       } else if (ev.t === 'mission') this.announce(ev.result === 'success' ? 'MISSION ACCOMPLISHED' : 'MISSION FAILED');
     }
   }
@@ -224,11 +225,11 @@ export class Hud {
 
     const m = w.content.mission;
     let obj: string;
-    if (w.phase === 'eliminate') obj = `${m.objectives[0].text}${w.alarm ? ' · TARGET FLEEING' : ''}`;
-    else if (w.phase === 'extract') obj = m.objectives[1].text;
-    else obj = w.phase === 'success' ? 'Mission accomplished' : 'Mission failed';
-    const bonus = `${m.bonus.text} ${w.stats.guardsPersuaded}/${m.population.guards}`;
-    const objHtml = `<span class="obj-main">${obj}</span><span class="obj-bonus">${bonus}</span>`;
+    const cur = currentObjective(w);
+    if (missionOver(w)) obj = w.phase === 'success' ? 'Mission accomplished' : 'Mission failed';
+    else obj = `${cur?.text ?? ''}${targetCanEscape(w) && w.alarm ? ' · TARGET FLEEING' : ''}`;
+    const bonus = m.bonus ? `${m.bonus.text} ${w.stats.guardsPersuaded}/${m.population.guards}` : '';
+    const objHtml = `<span class="obj-main">${obj}</span>${bonus ? `<span class="obj-bonus">${bonus}</span>` : ''}`;
     if (this.objective.innerHTML !== objHtml) this.objective.innerHTML = objHtml;
 
     const t = Math.floor(w.time);

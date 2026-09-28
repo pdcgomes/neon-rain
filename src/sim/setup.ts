@@ -1,4 +1,4 @@
-import type { AgentDef } from './content.ts';
+import type { AgentDef, SpawnDef } from './content.ts';
 import { GROUND_ALLEY, GROUND_PLAZA, GROUND_SIDEWALK } from './map.ts';
 import type { Entity, Vec2 } from './types.ts';
 import type { World } from './world.ts';
@@ -113,27 +113,106 @@ export function populate(world: World, squad: AgentDef[]): void {
     }
   });
 
-  // Target and bodyguards in the plaza.
-  const pz = map.plaza;
-  const pc = { x: pz.x + pz.w / 2, y: pz.y + pz.h / 2 };
-  const target = world.spawn('target', 'enemy', pc.x + 2.6, pc.y + 0.5, mission.targetName);
+  if (mission.spawns) placeSpawns(world, mission.spawns);
+  else placeNeonRain(world);
+
+  // Civilians.
+  world.civTarget = mission.population.civilians;
+  for (let i = 0; i < mission.population.civilians; i++) {
+    const c = spawnCivilian(world, randomPedestrianSpot(world, map.spawn, 6));
+    c.facing = rng.range(0, Math.PI * 2);
+  }
+
+  world.nextEnforcerAt = 0;
+}
+
+function spawnTarget(world: World, at: Vec2, name: string): Entity {
+  const target = world.spawn('target', 'enemy', at.x, at.y, name);
   target.hp = target.maxHp = 70;
   target.speed = 3.1;
   target.ai = 'idle';
   target.post = { x: target.x, y: target.y };
-  world.targetId = target.id;
+  if (world.targetId < 0) world.targetId = target.id;
+  return target;
+}
+
+function spawnGuard(world: World, at: Vec2, facing: number): Entity {
+  const g = world.spawn('guard', 'enemy', at.x, at.y, 'Bodyguard');
+  g.hp = g.maxHp = 90;
+  g.armor = 0.15;
+  g.speed = 5.0;
+  g.weapons = ['enemyUzi'];
+  g.holstered = false;
+  g.ai = 'guard';
+  g.post = { x: g.x, y: g.y };
+  g.facing = facing;
+  return g;
+}
+
+/** Places a mission's authored spawns exactly where the file says. */
+function placeSpawns(world: World, spawns: SpawnDef[]): void {
+  const mission = world.content.mission;
+  for (const s of spawns) {
+    const at = { x: s.x, y: s.y };
+    let e: Entity;
+    switch (s.kind) {
+      case 'civilian':
+        e = spawnCivilian(world, at);
+        break;
+      case 'police':
+        e = spawnPolice(world, at, 1);
+        break;
+      case 'enforcer':
+        e = spawnPolice(world, at, 2);
+        break;
+      case 'rival':
+        e = spawnRival(world, at);
+        break;
+      case 'heavy':
+        e = spawnRival(world, at, true);
+        e.ai = 'guard';
+        e.post = { x: e.x, y: e.y };
+        break;
+      case 'guard':
+        e = spawnGuard(world, at, s.facing ?? 0);
+        break;
+      case 'target':
+        e = spawnTarget(world, at, s.name ?? mission.targetName);
+        break;
+    }
+    if (s.name) e.name = s.name;
+    if (s.facing !== undefined) e.facing = s.facing;
+    if (s.weapons?.length) e.weapons = [...s.weapons];
+    if (s.hp) e.hp = e.maxHp = s.hp;
+    if (s.armor !== undefined) e.armor = s.armor;
+    if (s.holds && e.kind !== 'civilian' && e.kind !== 'police') {
+      e.ai = e.kind === 'target' ? 'idle' : 'guard';
+      e.post = { x: e.x, y: e.y };
+    } else if (s.patrol?.length && e.kind !== 'police' && e.kind !== 'target') {
+      // Armed units loop their route; a civilian (a VIP, say) walks it once.
+      if (e.kind !== 'civilian') {
+        e.ai = 'patrol';
+        e.post = null;
+      }
+      e.patrol = s.patrol.map((p) => ({ ...p }));
+      e.patrolIdx = 0;
+    }
+    world.spawnIds.set(s.id, e.id);
+  }
+}
+
+/** Neon Rain's hand-written placement: Voss and his detail in the plaza, rival pairs, police. */
+function placeNeonRain(world: World): void {
+  const { map, nav } = world;
+  const mission = world.content.mission;
+  // Target and bodyguards in the plaza.
+  const pz = map.plaza;
+  const pc = { x: pz.x + pz.w / 2, y: pz.y + pz.h / 2 };
+  const target = spawnTarget(world, { x: pc.x + 2.6, y: pc.y + 0.5 }, mission.targetName);
 
   for (let i = 0; i < mission.population.guards; i++) {
     const a = (i / mission.population.guards) * Math.PI * 2 + 0.4;
-    const g = world.spawn('guard', 'enemy', target.x + Math.cos(a) * 2.2, target.y + Math.sin(a) * 2.2, 'Bodyguard');
-    g.hp = g.maxHp = 90;
-    g.armor = 0.15;
-    g.speed = 5.0;
-    g.weapons = ['enemyUzi'];
-    g.holstered = false;
-    g.ai = 'guard';
-    g.post = { x: g.x, y: g.y };
-    g.facing = a;
+    spawnGuard(world, { x: target.x + Math.cos(a) * 2.2, y: target.y + Math.sin(a) * 2.2 }, a);
   }
 
   // Rival syndicate patrols: pairs looping between intersections around the plaza.
@@ -168,13 +247,4 @@ export function populate(world: World, squad: AgentDef[]): void {
   for (let i = 0; i < mission.population.police; i++) {
     spawnPolice(world, randomPedestrianSpot(world, map.spawn, 20), 1);
   }
-
-  // Civilians.
-  world.civTarget = mission.population.civilians;
-  for (let i = 0; i < mission.population.civilians; i++) {
-    const c = spawnCivilian(world, randomPedestrianSpot(world, map.spawn, 6));
-    c.facing = rng.range(0, Math.PI * 2);
-  }
-
-  world.nextEnforcerAt = 0;
 }

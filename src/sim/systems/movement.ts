@@ -39,9 +39,10 @@ function onRoad(world: World, x: number, y: number): boolean {
 export function goTo(world: World, e: Entity, x: number, y: number, repathEvery = 0.8): void {
   const end = e.path && e.path.length ? e.path[e.path.length - 1] : null;
   const moved = !end || Math.hypot(end.x - x, end.y - y) > 1.5;
-  if (!e.path || (moved && world.time >= e.repathAt)) {
+  // A failed search (unreachable goal) is retried on the normal repath interval, not every tick.
+  if ((!e.path && (e.pathIdx >= 0 || world.time >= e.repathAt)) || (moved && world.time >= e.repathAt)) {
     e.path = world.nav.findPath(e.x, e.y, x, y, e.radius, 16000, e.kind === 'agent' ? 0.4 : 3);
-    e.pathIdx = 0;
+    e.pathIdx = e.path ? 0 : -1;
     e.repathAt = world.time + repathEvery;
   }
 }

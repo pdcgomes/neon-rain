@@ -29,6 +29,11 @@ function convert(world: World, e: Entity, by: Entity): void {
   e.path = null;
   e.panic = 0;
   e.post = null;
+  if (e.kind === 'civilian' && e.patrol.length) {
+    // A scripted walker stops strolling its route and keeps up with the squad.
+    e.patrol = [];
+    e.pace = 1;
+  }
   e.holstered = false;
   world.stats.persuaded++;
   if (e.kind === 'guard') world.stats.guardsPersuaded++;
@@ -58,7 +63,8 @@ export function persuadeSystem(world: World): void {
       if (c.kind === 'target') {
         if (!shieldWarned && world.tick % 60 === 0) {
           shieldWarned = true;
-          world.emit({ t: 'bark', id: c.id, text: 'Voss has a neural shield. Persuasion is useless on him.', tone: 'hq' });
+          const text = world.content.mission.barks?.targetShielded ?? 'Voss has a neural shield. Persuasion is useless on him.';
+          world.emit({ t: 'bark', id: c.id, text, tone: 'hq' });
         }
         return;
       }

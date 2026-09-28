@@ -142,7 +142,7 @@ function combatAi(world: World, e: Entity): void {
   if (e.ai === 'guard' && e.post) {
     if (Math.hypot(e.post.x - e.x, e.post.y - e.y) > 1.2) goTo(world, e, e.post.x, e.post.y);
     else e.path = null;
-  } else if (e.ai === 'patrol' && e.kind === 'rival' && e.followId < 0 && e.patrol.length) {
+  } else if (e.ai === 'patrol' && e.kind !== 'police' && e.followId < 0 && e.patrol.length) {
     const wp = e.patrol[e.patrolIdx % e.patrol.length];
     if (Math.hypot(wp.x - e.x, wp.y - e.y) < 2) e.patrolIdx++;
     goTo(world, e, wp.x, wp.y, 1.5);

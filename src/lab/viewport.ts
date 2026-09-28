@@ -35,6 +35,18 @@ export class Viewport {
   onSelect: (p: Pickable | null) => void = () => {};
   onHover: (p: Pickable | null) => void = () => {};
   onChange: () => void = () => {};
+  private on = true;
+
+  /** Off while another Lab tool owns the shared canvas: no orbiting, picking or highlight boxes. */
+  get enabled(): boolean {
+    return this.on;
+  }
+
+  set enabled(v: boolean) {
+    this.on = v;
+    this.controls.enabled = v;
+    if (!v) this.hoverBox.visible = this.selectBox.visible = false;
+  }
 
   constructor(camera: THREE.PerspectiveCamera, dom: HTMLElement, overlay: THREE.Object3D) {
     this.camera = camera;
@@ -58,12 +70,13 @@ export class Viewport {
 
     let downAt = { x: 0, y: 0 };
     dom.addEventListener('pointerdown', (e) => (downAt = { x: e.clientX, y: e.clientY }));
-    dom.addEventListener('pointermove', (e) => this.hover(e));
+    dom.addEventListener('pointermove', (e) => this.on && this.hover(e));
     dom.addEventListener('pointerup', (e) => {
-      if (e.button !== 0 || Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 4) return;
+      if (!this.on || e.button !== 0 || Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 4) return;
       this.select(this.pick(e));
     });
     dom.addEventListener('dblclick', (e) => {
+      if (!this.on) return;
       const p = this.pick(e);
       if (p) this.frameObject(p.root);
       else this.frameBoard();
@@ -218,6 +231,6 @@ export class Viewport {
   }
 
   update(): void {
-    this.controls.update();
+    if (this.on) this.controls.update();
   }
 }

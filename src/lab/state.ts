@@ -1,8 +1,9 @@
 import type { StyleId } from './kits/types.ts';
 import type { LightPreset } from './stage.ts';
 import type { ViewPreset } from './viewport.ts';
+import { setParams } from './shell/url.ts';
 
-/** Everything that defines a view of the lab. Round-trips through the URL for deep links. */
+/** Everything that defines a view of the Art tool. Round-trips through the URL for deep links. */
 export interface LabState {
   board: string;
   style: StyleId;
@@ -76,16 +77,11 @@ export function readState(): LabState {
   return s;
 }
 
-let pending = 0;
 export function writeState(s: LabState): void {
-  window.clearTimeout(pending);
-  pending = window.setTimeout(() => {
-    const q = new URLSearchParams();
-    for (const k of Object.keys(DEFAULTS) as (keyof LabState)[]) {
-      const v = s[k];
-      if (v === DEFAULTS[k] || k === 't') continue;
-      q.set(k, typeof v === 'boolean' ? (v ? '1' : '0') : String(v));
-    }
-    history.replaceState(null, '', `${location.pathname}${q.toString() ? `?${q}` : ''}`);
-  }, 250);
+  const patch: Record<string, string | null> = {};
+  for (const k of Object.keys(DEFAULTS) as (keyof LabState)[]) {
+    const v = s[k];
+    patch[k] = v === DEFAULTS[k] || k === 't' ? null : typeof v === 'boolean' ? (v ? '1' : '0') : String(v);
+  }
+  setParams(patch);
 }

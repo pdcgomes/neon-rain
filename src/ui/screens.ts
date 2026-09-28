@@ -17,6 +17,9 @@ function screen(cls: string, html: string): HTMLDivElement {
   return d;
 }
 
+/** "01" for 01_downtown, "03" for synd_03. */
+const missionNumber = (m: MissionDef) => m.id.match(/\d+/)?.[0] ?? m.id;
+
 const LOGO = `<div class="logo"><span class="logo-mark">◢◤</span> EUROCORP <span class="logo-sub">// AGENT OPERATIONS TERMINAL</span></div>`;
 
 function memorial(fallen: FallenAgent[], highlight: Set<string>): string {
@@ -33,7 +36,20 @@ function memorial(fallen: FallenAgent[], highlight: Set<string>): string {
     .join('')}</div>`;
 }
 
-export function showBriefing(mission: MissionDef, save: Save, onDeploy: () => void, onChar: (ch: string) => void): void {
+export interface MissionPicker {
+  list: { id: string; local: boolean }[];
+  current: string;
+  pick(id: string): void;
+}
+
+export function showBriefing(mission: MissionDef, save: Save, onDeploy: () => void, onChar: (ch: string) => void, picker?: MissionPicker): void {
+  const pickerHtml =
+    picker && picker.list.length > 1
+      ? `<div class="h">OPERATION</div>
+        <select class="mission-pick">${picker.list
+          .map((m) => `<option value="${m.id}"${m.id === picker.current ? ' selected' : ''}>${m.id}${m.local ? ' · local' : ''}</option>`)
+          .join('')}</select>`
+      : '';
   const squad = save.roster
     .slice(0, 4)
     .map(
@@ -46,16 +62,17 @@ export function showBriefing(mission: MissionDef, save: Save, onDeploy: () => vo
     `${LOGO}
     <div class="brief-grid">
       <div class="brief-main">
-        <div class="brief-kicker">MISSION ${mission.id.split('_')[0]} · ${mission.city}</div>
+        <div class="brief-kicker">MISSION ${missionNumber(mission)} · ${mission.city}</div>
         <h1 class="brief-title glitch" data-text="${mission.codename}">${mission.codename}</h1>
         <div class="brief-text"></div>
         <div class="brief-obj">
           <div class="h">OBJECTIVES</div>
           ${mission.objectives.map((o) => `<div class="o">▸ ${o.text}</div>`).join('')}
-          <div class="o bonus">◇ BONUS: ${mission.bonus.text}</div>
+          ${mission.bonus ? `<div class="o bonus">◇ BONUS: ${mission.bonus.text}</div>` : ''}
         </div>
       </div>
       <div class="brief-side">
+        ${pickerHtml}
         <div class="h">ASSIGNED AGENTS</div>
         ${squad}
         <div class="h">LOADOUT</div>
@@ -123,6 +140,11 @@ export function showBriefing(mission: MissionDef, save: Save, onDeploy: () => vo
   };
   window.addEventListener('keydown', onKey);
   d.querySelector('.deploy')!.addEventListener('click', go);
+  d.querySelector<HTMLSelectElement>('.mission-pick')?.addEventListener('change', (e) => {
+    window.clearInterval(timer);
+    window.removeEventListener('keydown', onKey);
+    picker!.pick((e.target as HTMLSelectElement).value);
+  });
 }
 
 export interface LoadingScreen {
@@ -134,7 +156,7 @@ export function showLoading(mission: MissionDef): LoadingScreen {
     'loading',
     `${LOGO}
     <div class="load-box">
-      <div class="brief-kicker">MISSION ${mission.id.split('_')[0]} · ${mission.city}</div>
+      <div class="brief-kicker">MISSION ${missionNumber(mission)} · ${mission.city}</div>
       <div class="load-title">DEPLOYING ${mission.codename}</div>
       <div class="load-bar"><i></i></div>
       <div class="load-status">Establishing uplink…</div>

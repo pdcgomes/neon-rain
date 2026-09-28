@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { targetCanEscape } from '../sim/systems/objectives.ts';
 import type { SimEvent } from '../sim/types.ts';
 import type { World } from '../sim/world.ts';
 import { Actors } from './actors.ts';
@@ -268,7 +269,7 @@ export class GameRenderer {
     const extracting = world.phase === 'extract';
     (ex.material as THREE.MeshBasicMaterial).opacity = extracting ? 0.22 + Math.sin(time * 4) * 0.06 : 0.05;
     this.city.vtolPad.scale.setScalar(extracting ? 1 + Math.sin(time * 5) * 0.03 : 1);
-    this.city.escapeBeam.visible = world.alarm && world.phase === 'eliminate';
+    this.city.escapeBeam.visible = world.alarm && targetCanEscape(world);
 
     this.agentModels.update(world, alpha, dt);
     this.actors.update(world, alpha, dt, time, view.selected, this.agentModels.ids);

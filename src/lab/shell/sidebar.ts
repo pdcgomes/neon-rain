@@ -15,7 +15,6 @@ export class Sidebar {
     this.root = root;
     this.registry = registry;
     root.innerHTML = `
-      <div class="traffic"><span></span><span></span><span></span></div>
       <div class="app-title">Style Lab <small>Neon Rain</small></div>
       <div class="search">
         <svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -24,7 +23,7 @@ export class Sidebar {
       <nav class="nav"></nav>
       <div class="sidebar-foot">
         <kbd>↑</kbd><kbd>↓</kbd> boards · <kbd>←</kbd><kbd>→</kbd> sections<br />
-        <kbd>⌘1</kbd>–<kbd>⌘4</kbd> style · <kbd>Space</kbd> play · <kbd>F</kbd> frame
+        <kbd>⌥1</kbd>–<kbd>⌥4</kbd> style · <kbd>Space</kbd> play · <kbd>F</kbd> frame
       </div>`;
     this.nav = root.querySelector('.nav')!;
     const input = root.querySelector('input')!;

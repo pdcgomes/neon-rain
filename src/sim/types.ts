@@ -158,4 +158,5 @@ export interface MissionStats {
   grenades: number;
 }
 
-export type MissionPhase = 'eliminate' | 'extract' | 'success' | 'fail';
+/** 'active' while objectives remain; 'extract' once only the extraction is left. */
+export type MissionPhase = 'active' | 'extract' | 'success' | 'fail';

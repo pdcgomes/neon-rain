@@ -60,13 +60,14 @@ export class Stage {
   readonly camera = new THREE.PerspectiveCamera(32, 1, 0.1, 800);
   readonly content = new THREE.Group();
   readonly post: PostFX;
-  private canvas: HTMLCanvasElement;
+  readonly canvas: HTMLCanvasElement;
   private hemi = new THREE.HemisphereLight();
   private key = new THREE.DirectionalLight();
   private rim = new THREE.DirectionalLight();
   private accents: THREE.DirectionalLight[] = [];
   private floor: THREE.Mesh;
   private floorMat: THREE.MeshStandardMaterial;
+  private floorOn = true;
   private rain = new Rain();
   private silhouetteMat = new THREE.MeshBasicMaterial({ color: '#0b0b0f' });
   private env: THREE.Texture;
@@ -135,6 +136,19 @@ export class Stage {
       this.scene.background = new THREE.Color('#d9dae0');
       this.scene.fog = null;
     } else this.setPreset(this.preset);
+  }
+
+  /** Coloured rim and accent lights flatter single assets but glare off a city's wet puddles. */
+  setAccents(on: boolean): void {
+    const d = PRESETS[this.preset];
+    this.rim.intensity = on ? d.rimI : 0;
+    this.accents.forEach((l) => (l.intensity = on ? 1.8 * d.accents : 0));
+  }
+
+  /** The grid floor would z-fight with content that brings its own ground (a city preview). */
+  setFloor(on: boolean): void {
+    this.floorOn = on;
+    this.floor.visible = on;
   }
 
   setWet(on: boolean): void {
@@ -219,7 +233,7 @@ export class Stage {
       this.scene.overrideMaterial = null;
       this.scene.background = bg;
       this.scene.fog = fog;
-      this.floor.visible = true;
+      this.floor.visible = this.floorOn;
       return;
     }
     this.post.render(dt, performance.now() / 1000);

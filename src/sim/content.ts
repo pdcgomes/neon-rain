@@ -1,4 +1,5 @@
-import type { MapParams } from './map.ts';
+import type { MapParams, PropKind } from './map.ts';
+import type { Vec2 } from './types.ts';
 
 export type WeaponType = 'bullet' | 'rocket' | 'grenade' | 'persuade';
 
@@ -36,17 +37,89 @@ export interface AtmosphereDef {
   rain?: { min?: number; max?: number };
 }
 
+export const MISSION_VERSION = 2;
+
+/** A fixed, hand-authored (or imported) city instead of the procedural generator. */
+export interface MapLayout {
+  w: number;
+  h: number;
+  /** Ground type per cell (GROUND_* in map.ts), row-major, base64. */
+  ground: string;
+  /** Extra obstacles not covered by buildings or props (walls, fences, water): 1 per blocked cell, base64. */
+  blocked: string;
+  buildings: { x: number; y: number; w: number; h: number; height: number; style?: number; seed?: number }[];
+  props: { kind: PropKind; x: number; y: number; w?: number; h?: number; rot?: number; seed?: number }[];
+  spawn: Vec2;
+  extraction: Vec2;
+  /** Where a fleeing target heads (default: the exit furthest from the squad). */
+  escape?: Vec2;
+  /** Map-edge points where civilians leave and reinforcements arrive (default: walkable edge cells). */
+  exits?: Vec2[];
+  plaza?: { x: number; y: number; w: number; h: number };
+  /** Where the layout came from, for the editor's reference overlay. */
+  source?: { kind: 'syndicate'; mission: number; map: number; scale: number; origin: Vec2; classes?: string };
+}
+
+export type MapDef = ({ kind?: 'procedural' } & MapParams) | { kind: 'authored'; layout: MapLayout };
+
+export type SpawnKind = 'civilian' | 'police' | 'enforcer' | 'rival' | 'heavy' | 'guard' | 'target';
+
+export interface SpawnDef {
+  /** Stable id objectives can refer to. */
+  id: string;
+  kind: SpawnKind;
+  x: number;
+  y: number;
+  name?: string;
+  facing?: number;
+  weapons?: string[];
+  hp?: number;
+  armor?: number;
+  /** Walk this route (rivals, guards and heavies); loops. */
+  patrol?: Vec2[];
+  /** Hold position here instead of patrolling. */
+  holds?: boolean;
+}
+
+export type ObjectiveType = 'eliminate' | 'persuade' | 'protect' | 'extract' | 'reach' | 'sweep';
+
+export interface ObjectiveDef {
+  id: string;
+  text: string;
+  type?: ObjectiveType;
+  /** Spawn ids this objective is about (eliminate, persuade, protect, extract escorts). Empty = the mission target. */
+  targets?: string[];
+  /** Point to reach (extract, reach); defaults to the extraction marker. */
+  at?: Vec2;
+  radius?: number;
+  /** sweep: which sides must be wiped out. */
+  factions?: ('enemy' | 'police')[];
+  /** Announced when the objective completes. */
+  doneText?: string;
+  /** HQ chatter when the objective completes. */
+  doneBark?: string;
+  /** Reinforcements that arrive when the objective completes. */
+  reinforce?: { kind: 'rival'; count: number; near: 'extraction' | 'spawn' };
+  /** eliminate: the mission fails if a target reaches the escape point. */
+  escapeFails?: string;
+  /** Shown as success reason when this is the last objective. */
+  successText?: string;
+  /** Converter notes for things the game can't do yet. */
+  todo?: string;
+}
+
 export interface MissionDef {
+  version?: number;
   id: string;
   codename: string;
   city: string;
   seed: number;
-  map: MapParams;
+  map: MapDef;
   briefing: string[];
   targetName: string;
   targetCorp: string;
-  objectives: { id: string; text: string }[];
-  bonus: { id: string; text: string };
+  objectives: ObjectiveDef[];
+  bonus?: { id: string; text: string };
   population: {
     civilians: number;
     police: number;
@@ -55,9 +128,36 @@ export interface MissionDef {
     heavies: number;
     traffic?: number;
   };
+  /** Explicit placements; when present, the procedural target/guard/rival/police placement is skipped. */
+  spawns?: SpawnDef[];
   policeHostileAt: number;
   enforcersAt: number;
   atmosphere?: AtmosphereDef;
+  /** Mission-specific chatter (defaults are Neon Rain's lines). */
+  barks?: { targetFlees?: string; targetShielded?: string };
+}
+
+/**
+ * Brings older mission files up to the current format. Version 1 (Neon Rain as first written) had
+ * untyped "kill" and "extract" objectives whose behaviour was hard-coded in the objective system.
+ */
+export function upgradeMission(m: MissionDef): MissionDef {
+  const out: MissionDef = { ...m, version: MISSION_VERSION };
+  out.objectives = m.objectives.map((o) => {
+    if (o.type) return o;
+    if (o.id === 'kill')
+      return {
+        ...o,
+        type: 'eliminate',
+        doneText: 'Target eliminated. Proceed to the extraction VTOL.',
+        doneBark: 'Good work. A rival intercept team is moving on the VTOL. Expect resistance.',
+        reinforce: { kind: 'rival', count: 3, near: 'extraction' },
+        escapeFails: `${m.targetName.split(' ').pop()} reached his limousine and escaped the sector.`,
+      };
+    if (o.id === 'extract') return { ...o, type: 'extract', successText: 'Target terminated. Squad extracted.' };
+    return { ...o, type: 'reach' };
+  });
+  return out;
 }
 
 export interface Content {

@@ -2,6 +2,7 @@ import { nearestSidewalk, spawnCivilian } from '../setup.ts';
 import { DT } from '../time.ts';
 import type { Entity } from '../types.ts';
 import { GROUND_ROAD } from '../map.ts';
+import { goTo } from './movement.ts';
 import type { World } from '../world.ts';
 
 const WALK = 0.34;
@@ -77,6 +78,27 @@ export function crowdSystem(world: World): void {
         world.query(e.x, e.y, 2.6, (o) => {
           if (o.faction === 'civ' && o.panic <= 0 && world.rng.chance(0.55)) world.panicAt(o, e.lastSeenX, e.lastSeenY);
         });
+      }
+      continue;
+    }
+
+    // Scripted walkers (a VIP heading somewhere) follow their route once, then wait there.
+    if (e.patrol.length) {
+      e.pace = WALK;
+      if (e.patrolIdx >= e.patrol.length) {
+        e.path = null;
+        e.dvx = e.dvy = 0;
+        continue;
+      }
+      const wp = e.patrol[e.patrolIdx];
+      if (Math.hypot(wp.x - e.x, wp.y - e.y) < 1.5) e.patrolIdx++;
+      else if (e.path || world.time >= e.repathAt) {
+        goTo(world, e, wp.x, wp.y, 1);
+        // Unreachable on the flattened map (a rooftop, say): move on to the next point.
+        if (!e.path) {
+          e.patrolIdx++;
+          e.repathAt = world.time + 1;
+        }
       }
       continue;
     }

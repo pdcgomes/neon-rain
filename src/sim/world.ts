@@ -1,6 +1,7 @@
 import type { Command } from './commands.ts';
-import type { AgentDef, Content, WeaponDef } from './content.ts';
+import { upgradeMission, type AgentDef, type Content, type MissionDef, type WeaponDef } from './content.ts';
 import { generateCity, type CityMap } from './map.ts';
+import { buildAuthoredCity } from './mapAuthored.ts';
 import { Nav } from './nav.ts';
 import { Rng } from './rng.ts';
 import type { Entity, Faction, Kind, MissionPhase, MissionStats, Projectile, SimEvent } from './types.ts';
@@ -12,13 +13,19 @@ import { persuadeSystem } from './systems/persuade.ts';
 import { policeSystem } from './systems/police.ts';
 import { ipaSystem } from './systems/ipa.ts';
 import { crowdSystem } from './systems/crowd.ts';
-import { objectiveSystem } from './systems/objectives.ts';
+import { objectiveSystem, startObjectives } from './systems/objectives.ts';
 import { populate } from './setup.ts';
 import { Traffic } from './traffic.ts';
 import { DT } from './time.ts';
 
 export { DT, TICK_HZ } from './time.ts';
 const CELL = 4;
+
+/** The mission's city: the procedural generator, or a fixed authored layout. */
+export function buildCity(mission: MissionDef): CityMap {
+  const m = mission.map;
+  return m.kind === 'authored' ? buildAuthoredCity(mission.seed, m.layout) : generateCity(mission.seed, m);
+}
 
 export class World {
   readonly content: Content;
@@ -36,9 +43,13 @@ export class World {
   policeHostile = false;
   hostileSince = -1;
   alarm = false;
-  phase: MissionPhase = 'eliminate';
+  phase: MissionPhase = 'active';
   resultReason = '';
   targetId = -1;
+  /** Index of the objective currently being worked on. */
+  objectiveIdx = 0;
+  /** Entity id for each authored spawn id. */
+  spawnIds = new Map<string, number>();
   agentIds: number[] = [];
   extractTimer = 0;
   nextEnforcerAt = 0;
@@ -67,14 +78,15 @@ export class World {
   private buckets: number[][];
 
   constructor(content: Content, squad: AgentDef[], seed = content.mission.seed) {
-    this.content = content;
+    this.content = content = { ...content, mission: upgradeMission(content.mission) };
     this.rng = new Rng(seed ^ 0x9e3779b9);
-    this.map = generateCity(content.mission.seed, content.mission.map);
+    this.map = buildCity(content.mission);
     this.nav = new Nav(this.map);
     this.gw = Math.ceil(this.map.w / CELL);
     this.gh = Math.ceil(this.map.h / CELL);
     this.buckets = Array.from({ length: this.gw * this.gh }, () => []);
     populate(this, squad);
+    startObjectives(this);
     this.rebuildGrid();
     this.traffic = new Traffic(this, content.mission.population.traffic ?? 0);
   }
@@ -90,7 +102,7 @@ export class World {
       p.py = p.y;
       p.pz = p.z;
     }
-    if (this.phase === 'eliminate' || this.phase === 'extract') {
+    if (this.phase === 'active' || this.phase === 'extract') {
       for (const c of commands) applyCommand(this, c);
     }
     this.rebuildGrid();
@@ -405,7 +417,8 @@ export class World {
     if (target && target.alive && target.faction === 'enemy') {
       target.ai = 'escape';
       target.path = null;
-      this.emit({ t: 'bark', id: target.id, text: 'Voss is running for his limousine. Cut him off!', tone: 'hq' });
+      const text = this.content.mission.barks?.targetFlees ?? 'Voss is running for his limousine. Cut him off!';
+      this.emit({ t: 'bark', id: target.id, text, tone: 'hq' });
     }
   }
 

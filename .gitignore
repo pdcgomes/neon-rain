@@ -4,6 +4,10 @@ dist
 *.log
 shots
 
+# Original Syndicate data and missions converted from it (never commit)
+content-local/
+.synd-import/
+
 # Godot editor cache
 .godot/
 

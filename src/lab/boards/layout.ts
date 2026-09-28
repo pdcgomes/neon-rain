@@ -86,6 +86,15 @@ export const ICONS: Record<string, string> = {
   split: '<path d="M2.5 3h11v10h-11zM8 3v10" fill="none" stroke="currentColor" stroke-width="1.3"/>',
   cube: '<path d="M8 1.8 13.5 5v6L8 14.2 2.5 11V5L8 1.8Zm0 0v12.4M2.5 5 8 8l5.5-3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>',
   chip: '<path d="M4 4h8v8H4zM6 1.5V4M10 1.5V4M6 12v2.5M10 12v2.5M1.5 6H4M1.5 10H4M12 6h2.5M12 10h2.5" fill="none" stroke="currentColor" stroke-width="1.2"/>',
+  map: '<path d="M2 3.5 6 2l4 1.5L14 2v10.5L10 14l-4-1.5L2 14V3.5ZM6 2v10.5M10 3.5V14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
+  download: '<path d="M8 2v8M4.8 7 8 10.2 11.2 7M2.5 11.5V14h11v-2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+  pin: '<path d="M8 14s4.5-4.2 4.5-7.5a4.5 4.5 0 0 0-9 0C3.5 9.8 8 14 8 14Zm0-6a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" fill="none" stroke="currentColor" stroke-width="1.3"/>',
+  brush: '<path d="M13.5 2.5 7 9M7 9c-1.6-.4-3 .6-3 2.3 0 1.2-.8 1.9-1.8 2.2 2.8.8 5.6-.3 5.6-2.8L7 9Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>',
+  cursor: '<path d="M3.5 2.5 12.5 7l-4 1.2-1.6 4.3-3.4-10Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
+  route: '<path d="M3.5 12.5a1.5 1.5 0 1 0 0 .1M12.5 3.5a1.5 1.5 0 1 0 0 .1M5 12.5h4.5a2 2 0 0 0 0-4h-3a2 2 0 0 1 0-4H11" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+  rect: '<path d="M2.5 4h11v8h-11z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2 1.5"/>',
+  tree: '<path d="M8 1.8 12.5 8h-2.3L13 12H3l2.8-4H3.5L8 1.8ZM8 12v2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
+  check: '<path d="M3 8.5 6.5 12 13 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
 };
 
 export function icon(name: string): string {

@@ -159,7 +159,7 @@ export class Fx {
   private s = new THREE.Vector3();
 
   constructor(scene: THREE.Scene, world: World) {
-    this.mapSize = world.map.w;
+    this.mapSize = Math.max(world.map.w, world.map.h);
     this.group.add(this.sparks.points, this.smoke.points);
 
     this.tracers = new THREE.InstancedMesh(
@@ -261,6 +261,8 @@ export class Fx {
       N * 2,
     );
     const roads = [...world.map.roadsX.map((r) => ({ c: (r.start + r.end) / 2, axis: 0 as const })), ...world.map.roadsY.map((r) => ({ c: (r.start + r.end) / 2, axis: 1 as const }))];
+    // Without grid roads the sky lanes just cross the map at a few fixed offsets.
+    if (!roads.length) for (let k = 1; k <= 3; k++) roads.push({ c: (world.map.w * k) / 4, axis: 0 }, { c: (world.map.h * k) / 4, axis: 1 });
     for (let i = 0; i < N; i++) {
       const road = roads[Math.floor(hash2(i, 1, 4) * roads.length)];
       const along = hash2(i, 2, 4) * this.mapSize;

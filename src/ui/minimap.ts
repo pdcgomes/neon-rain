@@ -1,3 +1,4 @@
+import { targetCanEscape } from '../sim/systems/objectives.ts';
 import type { World } from '../sim/world.ts';
 
 const SIZE = 210;
@@ -14,7 +15,7 @@ export class Minimap {
     this.el.className = 'minimap';
     this.g = this.el.getContext('2d')!;
     const { map } = world;
-    this.k = (SIZE * 2) / map.w;
+    this.k = (SIZE * 2) / Math.max(map.w, map.h);
     this.base = document.createElement('canvas');
     this.base.width = this.base.height = SIZE * 2;
     const b = this.base.getContext('2d')!;
@@ -34,7 +35,7 @@ export class Minimap {
     b.strokeStyle = 'rgba(255, 79, 184, 0.5)';
     b.lineWidth = 2;
     const p = map.plaza;
-    b.strokeRect(p.x * this.k, p.y * this.k, p.w * this.k, p.h * this.k);
+    if (p.w > 0) b.strokeRect(p.x * this.k, p.y * this.k, p.w * this.k, p.h * this.k);
   }
 
   draw(world: World, yaw: number, cx: number, cz: number, time: number): void {
@@ -69,7 +70,7 @@ export class Minimap {
     g.beginPath();
     g.arc(ex.x * k, ex.y * k, 4.5 * k, 0, Math.PI * 2);
     g.stroke();
-    if (world.alarm && world.phase === 'eliminate') {
+    if (world.alarm && targetCanEscape(world)) {
       const es = world.map.escape;
       g.strokeStyle = `rgba(255,60,80,${0.4 + pulse * 0.6})`;
       g.beginPath();

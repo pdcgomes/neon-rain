@@ -110,6 +110,8 @@ export class Traffic {
     this.xs = map.roadsX.map((r) => (r.start + r.end) / 2);
     this.ys = map.roadsY.map((r) => (r.start + r.end) / 2);
     this.occupancy = Array.from({ length: this.xs.length * this.ys.length }, () => []);
+    // Cars drive the grid-road lanes; authored maps have none, so they get no traffic.
+    if (!this.xs.length || !this.ys.length) count = 0;
     this.target = count;
     this.w = map.w;
     this.h = map.h;
