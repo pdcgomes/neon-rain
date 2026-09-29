@@ -1,4 +1,5 @@
 import { DT } from '../time.ts';
+import { persuadeMul } from './ipa.ts';
 import type { Entity, Kind } from '../types.ts';
 import type { World } from '../world.ts';
 
@@ -54,7 +55,7 @@ export function persuadeSystem(world: World): void {
     a.holstered = false;
     if (world.tick % 9 === a.slot) world.emit({ t: 'persuading', by: a.id, x: a.aimX, y: a.aimY });
     if (followers < 0) followers = followerCount(world);
-    const boost = 1 + Math.min(followers, 10) * 0.07;
+    const boost = (1 + Math.min(followers, 10) * 0.07) * persuadeMul(a);
 
     world.query(a.x, a.y, w.range, (c) => {
       if (c.faction === 'player') return;

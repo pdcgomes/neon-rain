@@ -9,6 +9,11 @@
  * - structures that start higher than that (bridges, walkways) are dropped, leaving the street
  *   underneath walkable.
  *
+ * Large doors are open, as in the original. What the mission needs (targets, people to sweep,
+ * objective points) must be reachable from the drop zone, so where flattening cuts it off the
+ * columns along the original's own route to it (stairs, walkways, passages; see walk3d.ts) open up,
+ * and what the original only reaches by car, or not on foot at all, is handled as the notes say.
+ *
  * Blocked columns are merged greedily into rectangles of similar height, which become our buildings.
  * People become explicit spawns, their scenario chains become patrol routes, and objectives map onto
  * our objective types (anything we can't do yet is kept as a TODO note on the objective).
@@ -17,10 +22,11 @@ import type { MapLayout, MissionDef, ObjectiveDef, SpawnDef, SpawnKind } from '.
 import { encodeGrid } from '../../sim/grid64.ts';
 import { GROUND_ALLEY, GROUND_BUILDING, GROUND_PLAZA, GROUND_ROAD, GROUND_SIDEWALK } from '../../sim/map.ts';
 import type { Vec2 } from '../../sim/types.ts';
-import type { SyndGame, SyndPerson, SyndPos } from './gameFile.ts';
+import type { SyndGame, SyndObjective, SyndPerson, SyndPos } from './gameFile.ts';
 import type { SyndBriefing } from './missFile.ts';
 import { tileAt, type SyndMap } from './mapFile.ts';
 import { resolveTileClasses, type TileClass, type TileTable } from './tileClasses.ts';
+import { buildWalk3D, cheapestRoutes, floorsAt, UNREACHED } from './walk3d.ts';
 
 export interface ConvertOptions {
   /** Metres (sim cells) per Syndicate tile. */
@@ -94,16 +100,26 @@ export interface ConvertResult {
   counts: Record<string, number>;
 }
 
+/** Original weapon to Neon Rain weapon id: the same guns, since both sides share one weapon table. */
 const WEAPON_MAP: Record<string, string> = {
-  pistol: 'enemyPistol',
-  uzi: 'enemyUzi',
-  shotgun: 'riotGun',
+  pistol: 'pistol',
+  uzi: 'uzi',
+  shotgun: 'shotgun',
   minigun: 'minigun',
-  gauss: 'enemyGauss',
-  laser: 'enemyGauss',
-  flamer: 'riotGun',
-  longRange: 'enemyPistol',
+  gauss: 'gauss',
+  laser: 'laser',
+  flamer: 'flamer',
+  longRange: 'longRange',
 };
+
+/** Neon Rain health equivalent to the original's 16 (a full-health agent). */
+const AGENT_HP = 100;
+/** A squad that can walk over fewer columns than this in the original starts perched (on guard towers). */
+const PERCHED_COLUMNS = 64;
+/** How far (tiles) something cut off from the drop zone may move to reachable ground. */
+const MAX_SNAP_TILES = 10;
+/** How far (sim cells) something the mission needs may move off a parked car or wall edge. */
+const MAX_NUDGE_CELLS = 6;
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const titleCase = (s: string) => s.replace(/\b\w/g, (c) => c.toUpperCase());
@@ -121,7 +137,11 @@ export function convertMission(input: ConvertInput, opts: ConvertOptions): Conve
   const { game, map, col } = input;
   const notes: string[] = [];
   const cls = resolveTileClasses(col, opts.tiles);
-  const clsAt = (x: number, y: number, z: number): TileClass => cls[tileAt(map, x, y, z)];
+  const walk3d = buildWalk3D(map, col, game);
+  const clsAt = (x: number, y: number, z: number): TileClass => {
+    const t = tileAt(map, x, y, z);
+    return t && walk3d.opened.has((y * map.w + x) * map.levels + z) ? 'empty' : cls[t];
+  };
 
   const onMap = game.people.filter((p) => p.onMap);
 
@@ -265,6 +285,207 @@ export function convertMission(input: ConvertInput, opts: ConvertOptions): Conve
     if (cells[i] === Cell.Building || cells[i] === Cell.Wall) heights[i] = Math.max(1, tops[i] - street);
   }
 
+  // ---------------------------------------------------------------- who the mission is about
+  const inCrop = (p: { x: number; y: number }) => p.x >= crop.x && p.y >= crop.y && p.x < crop.x + crop.w && p.y < crop.y + crop.h;
+  const targets = new Set<number>();
+  const persuades = new Set<number>();
+  const protects = new Set<number>();
+  for (const o of game.objectives) {
+    if (o.target?.type !== 'person') continue;
+    if (o.kind === 'assassinate') targets.add(o.target.index);
+    if (o.kind === 'persuade') persuades.add(o.target.index);
+    if (o.kind === 'protect') protects.add(o.target.index);
+  }
+  const squad = onMap.filter((p) => p.cls === 'agent' && p.index < 4);
+  const squadAt = squad.length
+    ? { x: squad.reduce((s, p) => s + p.x, 0) / squad.length, y: squad.reduce((s, p) => s + p.y, 0) / squad.length }
+    : { x: crop.x + crop.w / 2, y: crop.y + crop.h / 2 };
+  const kindOf = (p: SyndPerson): SpawnKind | null => {
+    if (targets.has(p.index)) return 'target';
+    // Whoever the squad must protect walks their route as a civilian, whatever their class (often a rival agent).
+    if (protects.has(p.index)) return 'civilian';
+    switch (p.cls) {
+      case 'civilian':
+        return 'civilian';
+      case 'police':
+        return 'police';
+      case 'guard':
+        return p.weapons.includes('minigun') || p.weapons.includes('gauss') ? 'heavy' : 'guard';
+      case 'criminal':
+        return 'rival';
+      case 'agent':
+        return p.index < 8 ? null : 'rival';
+      default:
+        return 'civilian';
+    }
+  };
+  /** Where a point objective (evacuate, acquire, use or destroy a vehicle) happens. */
+  const pointOf = (o: SyndObjective): SyndPos | undefined => {
+    if (o.kind === 'persuade' || o.kind === 'assassinate' || o.kind === 'protect' || o.kind === 'sweepAll' || o.kind === 'sweepPolice') return undefined;
+    if (o.at) return o.at;
+    if (o.target?.type === 'weapon') return game.weapons.find((x) => x.index === o.target!.index);
+    if (o.target?.type === 'car') return game.cars.find((x) => x.index === o.target!.index);
+    return undefined;
+  };
+  const swept = new Set(game.objectives.flatMap((o) => (o.kind === 'sweepAll' ? ['enemy', 'police'] : o.kind === 'sweepPolice' ? ['police'] : [])));
+  const sideOf = (k: SpawnKind) => (k === 'police' || k === 'enforcer' ? 'police' : k === 'civilian' ? 'civ' : 'enemy');
+  interface Need {
+    at: SyndPos;
+    what: string;
+    /** People's heights are exact; points' (waypoints, objective spots) often aren't. */
+    exact: boolean;
+  }
+  const needs: Need[] = [];
+  const needy = new Set<number>();
+  for (const p of onMap) {
+    const k = kindOf(p);
+    if (!k) continue;
+    const role = targets.has(p.index) ? 'target' : persuades.has(p.index) ? 'persuasion target' : protects.has(p.index) ? 'VIP' : swept.has(sideOf(k)) ? k : '';
+    if (!role) continue;
+    needs.push({ at: p, what: `p${p.index} (${role})`, exact: true });
+    needy.add(p.index);
+    // A VIP's walk ends where the protect objective is done.
+    const end = protects.has(p.index) ? [...p.route].reverse().find(inCrop) : undefined;
+    if (end) needs.push({ at: end, what: `p${p.index}'s destination`, exact: false });
+  }
+  game.objectives.forEach((o, k) => {
+    const at = pointOf(o);
+    if (at) needs.push({ at, what: `objective ${k + 1} (${o.kind})`, exact: false });
+  });
+
+  // ---------------------------------------------------------------- connect them to the drop zone
+  // Flattening loses the original's stairs, walkways and upper floors, so people and points the
+  // mission is about can end up cut off from the drop zone. Where the original connects them on
+  // foot (or by car, through gates only cars pass), the columns along its cheapest route open up.
+  // Anything it doesn't connect at all (snipers on towers, a target on a roof) moves to the nearest
+  // ground the squad can reach.
+  const L = map.levels;
+  const open = (i: number) => cells[i] === Cell.Walk || cells[i] === Cell.Road || cells[i] === Cell.Crossing || cells[i] === Cell.Overpass;
+  const tileOf = (p: { x: number; y: number }) =>
+    Math.min(crop.h - 1, Math.max(0, Math.floor(p.y) - crop.y)) * crop.w + Math.min(crop.w - 1, Math.max(0, Math.floor(p.x) - crop.x));
+  const tileOfNode = (n: number) => {
+    const c = (n - (n % L)) / L;
+    return tileOf({ x: c % map.w, y: Math.floor(c / map.w) });
+  };
+  /** Component labels over open tiles (0 = closed). */
+  const components = () => {
+    const out = new Int32Array(N);
+    let next = 0;
+    for (let s = 0; s < N; s++) {
+      if (out[s] || !open(s)) continue;
+      out[s] = ++next;
+      const stack = [s];
+      while (stack.length) {
+        const i = stack.pop()!;
+        const tx = i % crop.w;
+        for (const j of [tx > 0 ? i - 1 : -1, tx < crop.w - 1 ? i + 1 : -1, i - crop.w, i + crop.w]) {
+          if (j < 0 || j >= N || out[j] || !open(j)) continue;
+          out[j] = next;
+          stack.push(j);
+        }
+      }
+    }
+    return out;
+  };
+  const nearestTile = (p: { x: number; y: number }, ok: (i: number) => boolean, maxR: number) => {
+    const cx = p.x - crop.x;
+    const cy = p.y - crop.y;
+    const r = Math.ceil(maxR);
+    let best = -1;
+    let bestD = Infinity;
+    for (let ty = Math.max(0, Math.floor(cy) - r); ty <= Math.min(crop.h - 1, Math.floor(cy) + r); ty++)
+      for (let tx = Math.max(0, Math.floor(cx) - r); tx <= Math.min(crop.w - 1, Math.floor(cx) + r); tx++) {
+        const d = Math.hypot(tx + 0.5 - cx, ty + 0.5 - cy);
+        if (d <= maxR && d < bestD && ok(ty * crop.w + tx)) [best, bestD] = [ty * crop.w + tx, d];
+      }
+    return best;
+  };
+
+  let comp = components();
+  let drop = nearestTile(squadAt, open, crop.w + crop.h);
+  // A squad that starts perched where it can't walk anywhere (guard towers, say) drops instead at
+  // the nearest ground holding most of what the mission needs.
+  const perch = cheapestRoutes(walk3d, squad.flatMap((p) => floorsAt(walk3d, p).slice(0, 1)), () => 0, () => true, false);
+  let squadColumns = 0;
+  for (let c = 0; c < map.w * map.h && squadColumns < PERCHED_COLUMNS; c++)
+    for (let z = 0; z < L; z++)
+      if (perch[c * L + z] !== UNREACHED) {
+        squadColumns++;
+        break;
+      }
+  if (squad.length && squadColumns < PERCHED_COLUMNS) {
+    const tally = new Map<number, number>();
+    for (const n of needs) if (inCrop(n.at) && comp[tileOf(n.at)]) tally.set(comp[tileOf(n.at)], (tally.get(comp[tileOf(n.at)]) ?? 0) + 1);
+    const [best, most] = [...tally].reduce((a, b) => (b[1] > a[1] ? b : a), [0, 0]);
+    if (best && drop >= 0 && most > (tally.get(comp[drop]) ?? 0)) {
+      drop = nearestTile(squadAt, (i) => comp[i] === best, crop.w + crop.h);
+      notes.push('The squad starts perched where it cannot walk anywhere; it drops at the nearest ground instead.');
+    }
+  }
+  const reachable = () => {
+    comp = components();
+    return drop >= 0 ? comp.map((c) => (c && c === comp[drop] ? 1 : 0)) : new Int32Array(N);
+  };
+  let reach = reachable();
+
+  const carved = new Uint8Array(N);
+  const onRoute = new Uint8Array(N);
+  const carve = (drive: boolean) => {
+    const cut = needs.filter((n) => inCrop(n.at) && !reach[tileOf(n.at)]);
+    if (!cut.length || drop < 0) return [];
+    const sources: number[] = [];
+    for (let i = 0; i < N; i++) {
+      if (!reach[i] || surf[i] < 0) continue;
+      const node = ((crop.y + Math.floor(i / crop.w)) * map.w + crop.x + (i % crop.w)) * L + surf[i];
+      if (walk3d.walkable(node)) sources.push(node);
+    }
+    const from = cheapestRoutes(walk3d, sources, (j) => (open(tileOfNode(j)) ? 0 : 1), (x, y) => inCrop({ x, y }), drive);
+    const joined: Need[] = [];
+    for (const n of cut) {
+      const floors = floorsAt(walk3d, n.at, drive);
+      const end = (n.exact ? floors.slice(0, 1) : floors).find((j) => from[j] !== UNREACHED);
+      if (end === undefined) continue;
+      for (let j = end; j >= 0; j = from[j]) {
+        const t = tileOfNode(j);
+        onRoute[t] = 1;
+        if (open(t)) continue;
+        const z = j % L;
+        const c = (j - z) / L;
+        const k = clsAt(c % map.w, Math.floor(c / map.w), z);
+        cells[t] = k === 'road' ? Cell.Road : k === 'crossing' ? Cell.Crossing : tops[t] > z + 1 ? Cell.Overpass : Cell.Walk;
+        heights[t] = 0;
+        carved[t] = 1;
+      }
+      joined.push(n);
+    }
+    reach = reachable();
+    return joined;
+  };
+  const list = (ns: Need[]) => (ns.length > 6 ? `${ns.slice(0, 5).map((n) => n.what).join(', ')} and ${ns.length - 5} more` : ns.map((n) => n.what).join(', '));
+  const onFoot = carve(false);
+  const byCar = walk3d.cars ? carve(true) : [];
+  const opened = carved.reduce((a, b) => a + b, 0);
+  if (onFoot.length) notes.push(`Opened ${opened} tiles along the original's stairs, walkways and passages to reach ${list(onFoot)}.`);
+  if (byCar.length) notes.push(`Only a car gets to ${list(byCar)} in the original; the road it takes is open on foot.`);
+
+  const moved = new Map<SyndPos, SyndPos>();
+  /** Where a person or point ends up: moved onto ground the squad can reach when it's cut off. */
+  const placed = (p: SyndPos): SyndPos => {
+    const m = moved.get(p);
+    if (m) return m;
+    if (!inCrop(p) || reach[tileOf(p)]) return p;
+    const t = nearestTile(p, (i) => !!reach[i], MAX_SNAP_TILES);
+    if (t < 0) return p;
+    const q = { x: crop.x + (t % crop.w) + 0.5, y: crop.y + Math.floor(t / crop.w) + 0.5, z: p.z };
+    moved.set(p, q);
+    return q;
+  };
+  const stuck = needs.filter((n) => inCrop(n.at) && !reach[tileOf(n.at)]);
+  const snapped = stuck.filter((n) => placed(n.at) !== n.at);
+  if (snapped.length) notes.push(`No way on foot to ${list(snapped)} in the original; moved to the nearest ground the squad can reach.`);
+  const lost = stuck.filter((n) => placed(n.at) === n.at);
+  if (lost.length) notes.push(`Still cut off from the drop zone: ${list(lost)}.`);
+
   // ---------------------------------------------------------------- scale up to sim cells
   const S = Math.max(1, Math.round(opts.scale));
   const W = crop.w * S;
@@ -350,7 +571,12 @@ export function convertMission(input: ConvertInput, opts: ConvertOptions): Conve
       if (!inside(p)) continue;
       const t = col[tileAt(map, Math.floor(c.x), Math.floor(c.y), street)];
       const alongX = t === 0x06 || t === 0x07;
-      props.push(alongX ? { kind: 'car', x: Math.floor(p.x - 2), y: Math.floor(p.y - 1), w: 4, h: 2 } : { kind: 'car', x: Math.floor(p.x - 1), y: Math.floor(p.y - 2), w: 2, h: 4 });
+      const car = alongX ? { kind: 'car' as const, x: Math.floor(p.x - 2), y: Math.floor(p.y - 1), w: 4, h: 2 } : { kind: 'car' as const, x: Math.floor(p.x - 1), y: Math.floor(p.y - 2), w: 2, h: 4 };
+      // Opened routes are a single tile wide; a parked car would close them again.
+      let inTheWay = false;
+      for (let y = car.y; y < car.y + car.h && !inTheWay; y++)
+        for (let x = car.x; x < car.x + car.w && !inTheWay; x++) inTheWay = x >= 0 && y >= 0 && x < W && y < H && !!onRoute[Math.floor(y / S) * crop.w + Math.floor(x / S)];
+      if (!inTheWay) props.push(car);
     }
   }
   if (opts.lamps) {
@@ -363,20 +589,7 @@ export function convertMission(input: ConvertInput, opts: ConvertOptions): Conve
   }
 
   // ---------------------------------------------------------------- people
-  const targets = new Set<number>();
-  const persuades = new Set<number>();
-  const protects = new Set<number>();
-  for (const o of game.objectives) {
-    if (o.target?.type !== 'person') continue;
-    if (o.kind === 'assassinate') targets.add(o.target.index);
-    if (o.kind === 'persuade') persuades.add(o.target.index);
-    if (o.kind === 'protect') protects.add(o.target.index);
-  }
-  const squad = onMap.filter((p) => p.cls === 'agent' && p.index < 4);
-  const squadAt = squad.length
-    ? { x: squad.reduce((s, p) => s + p.x, 0) / squad.length, y: squad.reduce((s, p) => s + p.y, 0) / squad.length }
-    : { x: crop.x + crop.w / 2, y: crop.y + crop.h / 2 };
-  const spawn = toCell(squadAt);
+  const spawn = drop < 0 || drop === tileOf(squadAt) ? toCell(squadAt) : { x: ((drop % crop.w) + 0.5) * S, y: (Math.floor(drop / crop.w) + 0.5) * S };
   // The VTOL waits a few metres from the drop point, on the side away from the mission area.
   const extraction = (() => {
     const cx = W / 2 - spawn.x;
@@ -388,47 +601,31 @@ export function convertMission(input: ConvertInput, opts: ConvertOptions): Conve
         const x = Math.round(spawn.x + Math.cos(a) * dist);
         const y = Math.round(spawn.y + Math.sin(a) * dist);
         if (x < 2 || y < 2 || x >= W - 2 || y >= H - 2) continue;
-        const c = cells[Math.floor(y / S) * crop.w + Math.floor(x / S)];
-        if (c === Cell.Walk || c === Cell.Road || c === Cell.Crossing) return { x, y };
+        const t = Math.floor(y / S) * crop.w + Math.floor(x / S);
+        const c = cells[t];
+        if ((c === Cell.Walk || c === Cell.Road || c === Cell.Crossing) && reach[t]) return { x, y };
       }
     }
-    return { x: spawn.x, y: spawn.y + 3 };
+    return { x: spawn.x, y: spawn.y };
   })();
 
-  const kindOf = (p: SyndPerson): SpawnKind | null => {
-    if (targets.has(p.index)) return 'target';
-    // Whoever the squad must protect walks their route as a civilian, whatever their class (often a rival agent).
-    if (protects.has(p.index)) return 'civilian';
-    switch (p.cls) {
-      case 'civilian':
-        return 'civilian';
-      case 'police':
-        return 'police';
-      case 'guard':
-        return p.weapons.includes('minigun') || p.weapons.includes('gauss') ? 'heavy' : 'guard';
-      case 'criminal':
-        return 'rival';
-      case 'agent':
-        return p.index < 8 ? null : 'rival';
-      default:
-        return 'civilian';
-    }
-  };
   const spawns: SpawnDef[] = [];
   const counts: Record<string, number> = {};
   for (const p of onMap) {
     const kind = kindOf(p);
     if (!kind) continue;
-    const at = toCell(p);
+    const at = toCell(needy.has(p.index) ? placed(p) : p);
     if (!inside(at)) continue;
     const s: SpawnDef = { id: `p${p.index}`, kind, x: at.x, y: at.y };
     const weapons = p.weapons.map((w) => WEAPON_MAP[w]).filter(Boolean);
     if (weapons.length && kind !== 'civilian' && kind !== 'target') s.weapons = [...new Set(weapons)];
+    // Original health is out of 16 (an agent's full health) and loads as at least 2.
+    if (kind !== 'civilian') s.hp = Math.round((Math.max(2, p.health) / 16) * AGENT_HP);
     if (p.cls === 'criminal') s.name = 'Criminal';
     if (p.cls === 'agent') s.name = 'Rival Agent';
     if (persuades.has(p.index)) s.name = 'Persuasion Target';
     if (protects.has(p.index)) s.name = 'Protected VIP';
-    const route = p.route.map(toCell).filter(inside);
+    const route = (needy.has(p.index) ? p.route.map(placed) : p.route).map(toCell).filter(inside);
     const scripted = protects.has(p.index) || persuades.has(p.index);
     if ((route.length > 1 && kind !== 'civilian' && kind !== 'police') || (route.length && scripted && kind === 'civilian')) s.patrol = route;
     else if (kind === 'guard' || kind === 'heavy') s.holds = true;
@@ -469,7 +666,7 @@ export function convertMission(input: ConvertInput, opts: ConvertOptions): Conve
         break;
       }
       case 'evacuate':
-        objectives.push({ id, type: 'extract', targets: [...persuaded], at: o.at ? toCell(o.at) : undefined, radius: 5, text: 'Escort the persuaded to the evacuation point', successText: 'Evacuation complete.' });
+        objectives.push({ id, type: 'extract', targets: [...persuaded], at: o.at ? toCell(placed(o.at)) : undefined, radius: 5, text: 'Escort the persuaded to the evacuation point', successText: 'Evacuation complete.' });
         break;
       case 'sweepAll':
         objectives.push({ id, type: 'sweep', factions: ['enemy', 'police'], text: 'Eliminate all enemy agents and police' });
@@ -478,15 +675,8 @@ export function convertMission(input: ConvertInput, opts: ConvertOptions): Conve
         objectives.push({ id, type: 'sweep', factions: ['police'], text: 'Eliminate the police force' });
         break;
       default: {
-        let at: Vec2 | undefined = o.at ? toCell(o.at) : undefined;
-        if (!at && o.target?.type === 'weapon') {
-          const w = game.weapons.find((x) => x.index === o.target!.index);
-          if (w) at = toCell(w);
-        }
-        if (!at && o.target?.type === 'car') {
-          const c = game.cars.find((x) => x.index === o.target!.index);
-          if (c) at = toCell(c);
-        }
+        const point = pointOf(o);
+        const at: Vec2 | undefined = point ? toCell(placed(point)) : undefined;
         const what = { acquire: 'Recover the equipment', destroyVehicle: 'Reach the target vehicle', useVehicle: 'Reach the vehicle' }[o.kind as string] ?? 'Reach the objective';
         objectives.push({ id, type: 'reach', at, radius: 3, text: what, todo: `Original objective "${o.kind}" (type ${o.kindId}) is approximated as reaching a point.` });
         notes.push(`Objective ${k + 1} (${o.kind}) is approximated as "reach a point".`);
@@ -500,6 +690,63 @@ export function convertMission(input: ConvertInput, opts: ConvertOptions): Conve
   }
   if (!objectives.length) objectives.push({ id: 'extract', type: 'extract', text: 'Reach the extraction VTOL' });
   for (const t of idsFor(targets)) if (!objectives.some((o) => o.targets?.includes(t))) notes.push(`Target ${t} has no objective.`);
+
+  // ---------------------------------------------------------------- final check at sim resolution
+  // Parked cars block too, and positions can sit on a tile's edge: nudge what the mission needs onto
+  // a nearby free cell the squad can walk to, as the sim will see it.
+  const closed = blocked.slice();
+  const fill = (x0: number, y0: number, w: number, h: number) => {
+    for (let y = Math.max(0, y0); y < Math.min(H, y0 + h); y++) closed.fill(1, y * W + Math.max(0, x0), y * W + Math.min(W, x0 + w));
+  };
+  for (const b of buildings) fill(b.x, b.y, b.w, b.h);
+  for (const p of props) if (p.kind === 'car') fill(p.x, p.y, p.w ?? 1, p.h ?? 1);
+  fill(0, 0, W, 1);
+  fill(0, H - 1, W, 1);
+  fill(0, 0, 1, H);
+  fill(W - 1, 0, 1, H);
+  const nearestCell = (p: Vec2, ok: (i: number) => boolean, maxR: number): number => {
+    const cx = Math.floor(p.x);
+    const cy = Math.floor(p.y);
+    const at = (x: number, y: number) => (x >= 0 && y >= 0 && x < W && y < H && ok(y * W + x) ? y * W + x : -1);
+    if (at(cx, cy) >= 0) return cy * W + cx;
+    for (let r = 1; r <= maxR; r++) {
+      let best = -1;
+      let bestD = Infinity;
+      for (let oy = -r; oy <= r; oy++)
+        for (let ox = -r; ox <= r; ox++) {
+          if (Math.max(Math.abs(ox), Math.abs(oy)) !== r || at(cx + ox, cy + oy) < 0) continue;
+          const d = (cx + ox + 0.5 - p.x) ** 2 + (cy + oy + 0.5 - p.y) ** 2;
+          if (d < bestD) [best, bestD] = [(cy + oy) * W + cx + ox, d];
+        }
+      if (best >= 0) return best;
+    }
+    return -1;
+  };
+  const walked = new Uint8Array(W * H);
+  // The lead agent lands at the spawn's top-left offset (see the sim's squad setup), snapped to a free cell.
+  const lead = nearestCell({ x: spawn.x - 0.8, y: spawn.y - 0.8 }, (i) => !closed[i], 12);
+  if (lead >= 0) {
+    const stack = [lead];
+    walked[lead] = 1;
+    while (stack.length) {
+      const i = stack.pop()!;
+      const x = i % W;
+      for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i - W, i + W]) {
+        if (j < 0 || j >= W * H || walked[j] || closed[j]) continue;
+        walked[j] = 1;
+        stack.push(j);
+      }
+    }
+  }
+  const nudge = (p: Vec2) => {
+    const i = nearestCell(p, (j) => !!walked[j], MAX_NUDGE_CELLS);
+    if (i < 0 || i === Math.floor(p.y) * W + Math.floor(p.x)) return;
+    p.x = (i % W) + 0.5;
+    p.y = Math.floor(i / W) + 0.5;
+  };
+  nudge(extraction);
+  for (const s of spawns) if (needy.has(Number(s.id.slice(1)))) nudge(s);
+  for (const o of objectives) if (o.at) nudge(o.at);
 
   // ---------------------------------------------------------------- briefing
   const br = input.briefing;

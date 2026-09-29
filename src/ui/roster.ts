@@ -1,4 +1,4 @@
-import { agentTemplate, recruitNames } from '../content/index.ts';
+import { agentKit, recruitNames } from '../content/index.ts';
 import type { AgentDef } from '../sim/content.ts';
 
 const KEY = 'syndicate-reborn.save.v1';
@@ -53,8 +53,10 @@ export function storeSave(s: Save): void {
   }
 }
 
+/** The squad for the next mission, kitted out with everything the syndicate's wins have unlocked. */
 export function squadFromSave(s: Save): AgentDef[] {
-  return s.roster.slice(0, 4).map((r) => ({ ...agentTemplate, loadout: [...agentTemplate.loadout], name: r.name }));
+  const kit = agentKit(s.wins);
+  return s.roster.slice(0, 4).map((r) => ({ ...kit, loadout: [...kit.loadout], name: r.name }));
 }
 
 /** Applies a finished mission to the persistent roster. Returns the agents who fell this mission. */

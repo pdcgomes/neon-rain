@@ -6,9 +6,9 @@ import { Minimap } from './minimap.ts';
 
 const WEAPON_KEYS = ['Z', 'X', 'C', 'V'];
 const IPA: { key: 'a' | 'p' | 'i'; label: string; title: string }[] = [
-  { key: 'a', label: 'ADR', title: 'Adrenaline: speed and rate of fire' },
-  { key: 'p', label: 'PER', title: 'Perception: auto-targeting range' },
-  { key: 'i', label: 'INT', title: 'Intelligence: accuracy' },
+  { key: 'a', label: 'ADR', title: 'Adrenaline: speed, reactions and rate of fire; erratic if Intelligence lags. The line is dependency: dose above it boosts, below it dulls.' },
+  { key: 'p', label: 'PER', title: 'Perception: aim, how far the agent watches, persuasion' },
+  { key: 'i', label: 'INT', title: 'Intelligence: judgement when acting alone (target choice, holding fire, ducking out when hurt)' },
 ];
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
@@ -24,7 +24,7 @@ interface Card {
   hpText: HTMLSpanElement;
   weapon: HTMLSpanElement;
   team: HTMLSpanElement;
-  ipa: Record<'a' | 'p' | 'i', HTMLDivElement>;
+  ipa: Record<'a' | 'p' | 'i', { dose: HTMLDivElement; effect: HTMLDivElement; dep: HTMLDivElement }>;
 }
 
 export class Hud {
@@ -105,22 +105,23 @@ export class Hud {
     hpBar.append(hp, hpText);
     const weapon = el('span', 'card-weapon');
     const ipaWrap = el('div', 'ipa');
-    const ipa = {} as Record<'a' | 'p' | 'i', HTMLDivElement>;
+    const ipa = {} as Card['ipa'];
     for (const ch of IPA) {
       const row = el('div', `ipa-row ipa-${ch.key}`);
       row.title = ch.title;
       const label = el('span', 'ipa-label', ch.label);
       const track = el('div', 'ipa-track');
       const fill = el('div', 'ipa-fill');
-      track.appendChild(fill);
+      const effect = el('div', 'ipa-effect');
+      const dep = el('div', 'ipa-dep');
+      track.append(fill, effect, dep);
       row.append(label, track);
       ipaWrap.appendChild(row);
-      ipa[ch.key] = fill;
+      ipa[ch.key] = { dose: fill, effect, dep };
       const setFrom = (ev: PointerEvent) => {
         const r = track.getBoundingClientRect();
         const v = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
         this.controls.setIpa(ch.key, v, [a.id]);
-        fill.style.width = `${v * 100}%`;
       };
       track.addEventListener('pointerdown', (ev) => {
         ev.stopPropagation();
@@ -200,7 +201,12 @@ export class Hud {
       const wd = w.weapon(a);
       c.weapon.textContent = !a.alive ? 'SIGNAL LOST' : a.holstered ? `${wd?.name ?? ''} · HOLSTERED` : (wd?.name ?? '').toUpperCase();
       c.weapon.classList.toggle('drawn', a.alive && !a.holstered);
-      for (const ch of IPA) c.ipa[ch.key].style.width = `${(a.overdrive ? 1 : a.ipa[ch.key]) * 100}%`;
+      for (const ch of IPA) {
+        const bar = c.ipa[ch.key];
+        bar.dose.style.width = `${a.ipa[ch.key] * 100}%`;
+        bar.effect.style.width = `${Math.min(a.ipa[ch.key], a.ipaEff[ch.key]) * 100}%`;
+        bar.dep.style.left = `${a.ipaDep[ch.key] * 100}%`;
+      }
     }
 
     // Weapon bar for the lead selected agent.

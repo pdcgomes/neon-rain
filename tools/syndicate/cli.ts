@@ -7,7 +7,7 @@
  *   npm run synd -- convert --mission 1 [--scale 3]      # content-local/missions/synd_01.json
  *   npm run synd -- convert --all [--set revolt]
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { SyndDataset } from '../../src/import/syndicate/dataset.ts';
 import { overlayGame, renderConverted, renderOriginal, type Raster } from '../../src/import/syndicate/raster.ts';
@@ -68,13 +68,41 @@ if (cmd === 'list') {
   const list = flag('all') ? ds.missions().filter((n) => n < 90) : [Number(opt('mission') ?? 1)];
   const out = resolve('content-local/missions');
   mkdirSync(out, { recursive: true });
+  // The American Revolt data disk ships all 50 mission files; only the ones that differ are its own.
+  const base = ds.info.key !== 'syndicate' ? sets.get('syndicate') : undefined;
   for (const n of list) {
+    if (base && JSON.stringify(base.game(n)) === JSON.stringify(ds.game(n))) {
+      const stale = `${out}/${ds.info.key}_${pad2(n)}.json`;
+      if (existsSync(stale)) rmSync(stale);
+      console.log(`${ds.info.key}_${pad2(n)}  same as syndicate_${pad2(n)}, skipped`);
+      continue;
+    }
     const res = ds.convert(n, opt('scale') ? { scale: Number(opt('scale')) } : {});
     const file = `${out}/${res.mission.id}.json`;
     writeFileSync(file, JSON.stringify(res.mission));
     const l = res.mission.map.kind === 'authored' ? res.mission.map.layout : null;
     console.log(`${res.mission.id}  ${res.mission.codename.padEnd(28)} ${l?.w}x${l?.h} m  ${res.counts.buildings} buildings  ${res.mission.spawns?.length} spawns  ${res.mission.objectives.map((o) => o.type).join(' > ')}`);
     for (const note of res.notes) console.log('   -', note);
+  }
+} else if (cmd === 'stats') {
+  // Opposition per mission: armed people by class, with health, mods and IPA as stored in GAMExx.DAT.
+  const cls = (opt('class') ?? 'agent,guard,police').split(',');
+  const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+  console.log(`${ds.info.label}: people on the map by class; hp, mods (L A C H E B) and IPA (A I P amount) are averages\n`);
+  for (const n of ds.missions().filter((m) => m < 90)) {
+    const g = ds.game(n)!;
+    const s = ds.summary(n);
+    const cells = cls.map((c) => {
+      const ps = g.people.filter((p) => p.onMap && p.cls === c && p.index >= (c === 'agent' ? 8 : 0));
+      if (!ps.length) return `${c} -`.padEnd(64);
+      const mods = (['legs', 'arms', 'chest', 'heart', 'eyes', 'brain'] as const).map((k) => avg(ps.map((p) => p.mods[k])).toFixed(1)).join(' ');
+      const ipa = (['adrenaline', 'intelligence', 'perception'] as const).map((k) => Math.round(avg(ps.map((p) => p.ipa[k].amount)))).join(' ');
+      const weapons = new Map<string, number>();
+      for (const p of ps) for (const w of p.weapons) weapons.set(w, (weapons.get(w) ?? 0) + 1);
+      const top = [...weapons].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([w, k]) => `${w}×${k}`).join(',');
+      return `${c} ${String(ps.length).padStart(2)} hp ${String(Math.round(avg(ps.map((p) => p.health)))).padStart(3)} mods ${mods} ipa ${ipa.padEnd(11)} ${top}`.padEnd(64);
+    });
+    console.log(`${pad2(n)} ${s.title.slice(0, 18).padEnd(18)} ${cells.join(' | ')}`);
   }
 } else {
   console.error(`Unknown command ${cmd}`);

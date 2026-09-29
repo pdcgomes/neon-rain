@@ -188,17 +188,24 @@ body {
   cursor: ew-resize;
   position: relative;
 }
-.ipa-track::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: -1px;
-  bottom: -1px;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.25);
-}
 .ipa-fill {
   height: 100%;
+}
+/* The part of the dose that has taken hold, darker over the dose; and the dependency line. */
+.ipa-effect {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.45);
+}
+.ipa-dep {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(255, 255, 255, 0.7);
 }
 .ipa-a .ipa-fill {
   background: #ff5a7a;

@@ -1,3 +1,4 @@
+import { balance, CHEST_ARMOR } from './balance.ts';
 import type { AgentDef, SpawnDef } from './content.ts';
 import { GROUND_ALLEY, GROUND_PLAZA, GROUND_SIDEWALK } from './map.ts';
 import type { Entity, Vec2 } from './types.ts';
@@ -50,12 +51,12 @@ export function spawnCivilian(world: World, at: Vec2): Entity {
 export function spawnPolice(world: World, at: Vec2, tier: 1 | 2): Entity {
   const e = world.spawn(tier === 1 ? 'police' : 'enforcer', 'police', at.x, at.y, tier === 1 ? 'Officer' : 'Enforcer');
   if (tier === 1) {
-    e.hp = e.maxHp = 60;
+    e.hp = e.maxHp = 50;
     e.speed = 4.4;
     e.weapons = ['enemyPistol'];
   } else {
-    e.hp = e.maxHp = 110;
-    e.armor = 0.3;
+    e.hp = e.maxHp = 100;
+    e.armor = CHEST_ARMOR[2];
     e.speed = 4.8;
     e.weapons = ['riotGun'];
   }
@@ -65,16 +66,30 @@ export function spawnPolice(world: World, at: Vec2, tier: 1 | 2): Entity {
   return e;
 }
 
+/**
+ * Rival agents are cyborgs built with the same technology as the squad: they carry the squad's
+ * best gun (sometimes its second best) and its best chest mod, as in the original.
+ */
 export function spawnRival(world: World, at: Vec2, heavy = false): Entity {
   const e = world.spawn('rival', 'enemy', at.x, at.y, heavy ? 'Heavy' : 'Rival Agent');
-  e.hp = e.maxHp = heavy ? 150 : 95;
-  e.armor = heavy ? 0.25 : 0.1;
+  e.hp = e.maxHp = 100;
+  e.chest = heavy ? Math.max(2, world.rivalChest) : world.rivalChest;
+  e.armor = CHEST_ARMOR[e.chest];
   e.speed = heavy ? 4.2 : 5.0;
-  e.weapons = [heavy ? 'enemyGauss' : 'enemyUzi'];
-  e.ammo = heavy ? 99 : 0;
+  const [best, second] = world.rivalArms;
+  e.weapons = [heavy ? 'enemyGauss' : second && world.rng.chance(balance.rivalSecondGun) ? second : best];
   e.holstered = false;
   e.ai = 'patrol';
   return e;
+}
+
+/** The squad's two best guns by rank and its best chest mod, which rival agents are issued. */
+function rivalKit(world: World, squad: AgentDef[]): void {
+  const weapons = world.content.weapons;
+  const guns = [...new Set(squad.flatMap((d) => d.loadout))].filter((id) => weapons[id] && weapons[id].type !== 'persuade' && weapons[id].rank >= 0);
+  guns.sort((a, b) => weapons[b].rank - weapons[a].rank);
+  world.rivalArms = guns.length ? guns.slice(0, 2) : ['pistol'];
+  world.rivalChest = Math.max(0, ...squad.map((d) => d.chest ?? 0));
 }
 
 export function populate(world: World, squad: AgentDef[]): void {
@@ -92,12 +107,14 @@ export function populate(world: World, squad: AgentDef[]): void {
     [-0.8, 0.8],
     [0.8, 0.8],
   ];
+  rivalKit(world, squad);
   squad.slice(0, 4).forEach((def, i) => {
     const e = world.spawn('agent', 'player', map.spawn.x + offsets[i][0], map.spawn.y + offsets[i][1], def.name);
     e.hp = e.maxHp = def.hp;
     e.speed = def.speed;
     e.radius = 0.34;
-    e.armor = 0.35;
+    e.chest = def.chest ?? 0;
+    e.armor = CHEST_ARMOR[e.chest];
     e.weapons = [...def.loadout];
     e.grenades = def.grenades;
     e.slot = i;
@@ -128,7 +145,7 @@ export function populate(world: World, squad: AgentDef[]): void {
 
 function spawnTarget(world: World, at: Vec2, name: string): Entity {
   const target = world.spawn('target', 'enemy', at.x, at.y, name);
-  target.hp = target.maxHp = 70;
+  target.hp = target.maxHp = 50;
   target.speed = 3.1;
   target.ai = 'idle';
   target.post = { x: target.x, y: target.y };
@@ -138,8 +155,7 @@ function spawnTarget(world: World, at: Vec2, name: string): Entity {
 
 function spawnGuard(world: World, at: Vec2, facing: number): Entity {
   const g = world.spawn('guard', 'enemy', at.x, at.y, 'Bodyguard');
-  g.hp = g.maxHp = 90;
-  g.armor = 0.15;
+  g.hp = g.maxHp = 50;
   g.speed = 5.0;
   g.weapons = ['enemyUzi'];
   g.holstered = false;

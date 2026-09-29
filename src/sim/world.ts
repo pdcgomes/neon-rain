@@ -46,6 +46,9 @@ export class World {
   phase: MissionPhase = 'active';
   resultReason = '';
   targetId = -1;
+  /** Guns rival agents are issued (the squad's best two) and their chest mod version. */
+  rivalArms: string[] = ['pistol'];
+  rivalChest = 0;
   /** Index of the objective currently being worked on. */
   objectiveIdx = 0;
   /** Entity id for each authored spawn id. */
@@ -145,6 +148,7 @@ export class World {
       hp: 50,
       maxHp: 50,
       armor: 0,
+      chest: 0,
       alive: true,
       deadAt: -1,
       lastDamagedAt: -99,
@@ -152,7 +156,7 @@ export class World {
       weaponIdx: 0,
       cooldown: 0,
       spin: 0,
-      ammo: 0,
+      ammo: {},
       grenades: 0,
       holstered: true,
       lastShotAt: -99,
@@ -172,6 +176,8 @@ export class World {
       team: 0,
       slot: -1,
       ipa: { a: 0.5, p: 0.5, i: 0.5 },
+      ipaDep: { a: 0.5, p: 0.5, i: 0.5 },
+      ipaEff: { a: 0.5, p: 0.5, i: 0.5 },
       overdrive: false,
       ai: 'idle',
       targetId: -1,

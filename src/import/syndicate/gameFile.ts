@@ -81,9 +81,28 @@ export interface SyndPerson extends SyndPos {
   health: number;
   facing: number;
   weapons: string[];
+  /** Cyborg mod versions, 0 (none) to 3. */
+  mods: SyndMods;
+  /** IPA bars as stored (amount, dependency, effect; 0..255 each). */
+  ipa: Record<'adrenaline' | 'intelligence' | 'perception', SyndIpa>;
   /** Waypoint chain this person follows, in tile units. */
   route: SyndWaypoint[];
   loops: boolean;
+}
+
+export interface SyndMods {
+  legs: number;
+  arms: number;
+  chest: number;
+  heart: number;
+  eyes: number;
+  brain: number;
+}
+
+export interface SyndIpa {
+  amount: number;
+  dependency: number;
+  effect: number;
 }
 
 export interface SyndCar extends SyndPos {
@@ -179,6 +198,10 @@ export function parseGame(data: Uint8Array): SyndGame {
     const ref = o - REF_BASE;
     const state = u8(o + 10);
     const { route, loops } = scenarioChain(u16(o + 40));
+    // Mod bitmask: bit 0 gender, then two bits each for legs, arms, chest, heart, eyes, brain.
+    const m = u16(o + 60);
+    const mod = (k: number) => (m >> (1 + 2 * k)) & 3;
+    const ipa = (at: number): SyndIpa => ({ amount: u8(at), dependency: u8(at + 1), effect: u8(at + 2) });
     people.push({
       index: i,
       ref,
@@ -189,6 +212,8 @@ export function parseGame(data: Uint8Array): SyndGame {
       health: u16(o + 20),
       facing: facing(u8(o + 26)),
       weapons: weapons.filter((w) => w.ownerRef === ref).map((w) => w.kind),
+      mods: { legs: mod(0), arms: mod(1), chest: mod(2), heart: mod(3), eyes: mod(4), brain: mod(5) },
+      ipa: { adrenaline: ipa(o + 71), intelligence: ipa(o + 75), perception: ipa(o + 79) },
       route,
       loops,
     });

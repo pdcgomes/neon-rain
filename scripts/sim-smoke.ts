@@ -9,16 +9,18 @@
  * Neon Rain always runs the full 150 s so its checksum stays comparable between versions.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { resolveWeapons, upgradeMission, type AgentDef, type Content, type MissionDef, type WeaponDef } from '../src/sim/content.ts';
+import { kitFor, resolveWeapons, upgradeMission, type AgentDef, type Content, type MissionDef, type RawWeapons } from '../src/sim/content.ts';
 import type { Command } from '../src/sim/commands.ts';
 import { currentObjective, objectiveTargets } from '../src/sim/systems/objectives.ts';
 import { World } from '../src/sim/world.ts';
 
 const root = new URL('..', import.meta.url);
 const load = (p: string) => JSON.parse(readFileSync(new URL(p, root), 'utf8'));
-const weapons = resolveWeapons(load('src/content/weapons.json') as Record<string, Partial<WeaponDef>>);
+const weapons = resolveWeapons(load('src/content/weapons.json') as RawWeapons);
 const agentsJson = load('src/content/agents.json');
-const squad: AgentDef[] = ['Kade', 'Ivo', 'Rhee', 'Mara'].map((name) => ({ name, ...agentsJson.template }));
+// Eight missions in: long-range rifle, Uzi, minigun and Persuadertron, so the minigun sits in slot 2.
+const kit = kitFor(agentsJson.template.loadout, agentsJson.progression, weapons, 8);
+const squad: AgentDef[] = ['Kade', 'Ivo', 'Rhee', 'Mara'].map((name) => ({ name, ...agentsJson.template, ...kit }));
 
 const args = process.argv.slice(2);
 const quick = !args.includes('--full');

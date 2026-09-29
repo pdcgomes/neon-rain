@@ -18,6 +18,12 @@ export interface WeaponDef {
   noise: number;
   ammo: number;
   fuse: number;
+  /** Projectiles per trigger pull (shotgun), each with its own spread. */
+  pellets: number;
+  /** Carries on through everyone in its path (laser). */
+  pierce: boolean;
+  /** Preference when rival agents are armed from the player's arsenal: higher is better. */
+  rank: number;
   color: string;
 }
 
@@ -27,6 +33,8 @@ export interface AgentDef {
   speed: number;
   loadout: string[];
   grenades: number;
+  /** Chest mod version, 0 (none) to 3: armour, and self-repair from V2. */
+  chest?: number;
 }
 
 /** When and in what weather a mission takes place. */
@@ -132,6 +140,8 @@ export interface MissionDef {
   spawns?: SpawnDef[];
   policeHostileAt: number;
   enforcersAt: number;
+  /** Multiplier on how long enemies take to open fire (American Revolt: 0.5, "at least twice as fast"). */
+  enemyReaction?: number;
   atmosphere?: AtmosphereDef;
   /** Mission-specific chatter (defaults are Neon Rain's lines). */
   barks?: { targetFlees?: string; targetShielded?: string };
@@ -160,6 +170,30 @@ export function upgradeMission(m: MissionDef): MissionDef {
   return out;
 }
 
+/** What the squad has earned by winning missions: weapons, and chest mods. */
+export interface ProgressionDef {
+  /** Weapons and the wins needed to unlock them (the original's research tree, paced over the campaign). */
+  unlocks: { weapon: string; after: number }[];
+  /** Wins needed for chest mod V1, V2, V3. */
+  chestAfter: number[];
+}
+
+/**
+ * The kit for a squad with `wins` missions behind it: the three best guns unlocked so far (by
+ * rank, a Gauss gun taking the third slot once there is one), plus the Persuadertron.
+ */
+export function kitFor(start: string[], p: ProgressionDef, weapons: Record<string, WeaponDef>, wins: number): { loadout: string[]; chest: number } {
+  const earned = p.unlocks.filter((u) => wins >= u.after).map((u) => u.weapon);
+  const owned = [...new Set([...start, ...earned])].filter((id) => weapons[id]);
+  const guns = owned.filter((id) => weapons[id].type !== 'persuade' && id !== 'gauss').sort((a, b) => weapons[b].rank - weapons[a].rank);
+  const gauss = owned.includes('gauss');
+  const loadout = guns.slice(0, gauss ? 2 : 3).sort((a, b) => weapons[a].rank - weapons[b].rank);
+  if (gauss) loadout.push('gauss');
+  if (owned.includes('persuadertron')) loadout.push('persuadertron');
+  const chest = p.chestAfter.filter((n) => wins >= n).length;
+  return { loadout, chest };
+}
+
 export interface Content {
   weapons: Record<string, WeaponDef>;
   agents: AgentDef[];
@@ -181,11 +215,24 @@ const WEAPON_DEFAULTS: WeaponDef = {
   noise: 10,
   ammo: -1,
   fuse: 0,
+  pellets: 1,
+  pierce: false,
+  rank: -1,
   color: '#ffd27a',
 };
 
-export function resolveWeapons(raw: Record<string, Partial<WeaponDef>>): Record<string, WeaponDef> {
+/** Weapon table entries; `like` copies another entry's stats (the same gun under another name). */
+export type RawWeapons = Record<string, Partial<WeaponDef> & { like?: string }>;
+
+export function resolveWeapons(raw: RawWeapons): Record<string, WeaponDef> {
   const out: Record<string, WeaponDef> = {};
-  for (const [id, w] of Object.entries(raw)) out[id] = { ...WEAPON_DEFAULTS, ...w };
+  const own = (id: string) => {
+    const { like: _, ...w } = raw[id];
+    return w;
+  };
+  for (const [id, { like }] of Object.entries(raw)) {
+    if (like && !raw[like]) throw new Error(`weapon ${id} is like unknown weapon ${like}`);
+    out[id] = { ...WEAPON_DEFAULTS, ...(like ? own(like) : {}), ...own(id) };
+  }
   return out;
 }

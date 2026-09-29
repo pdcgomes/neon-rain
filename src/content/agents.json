@@ -2,8 +2,19 @@
   "template": {
     "hp": 100,
     "speed": 5.2,
-    "loadout": ["pistol", "uzi", "minigun", "persuadertron"],
+    "loadout": ["pistol", "shotgun", "persuadertron"],
     "grenades": 2
+  },
+  "progression": {
+    "unlocks": [
+      { "weapon": "uzi", "after": 1 },
+      { "weapon": "longRange", "after": 4 },
+      { "weapon": "minigun", "after": 8 },
+      { "weapon": "flamer", "after": 12 },
+      { "weapon": "laser", "after": 18 },
+      { "weapon": "gauss", "after": 25 }
+    ],
+    "chestAfter": [5, 15, 28]
   },
   "recruitNames": [
     "Kade", "Ivo", "Rhee", "Mara", "Solis", "Dacha", "Nyx", "Brann", "Oskar", "Yuki",

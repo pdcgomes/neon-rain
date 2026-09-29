@@ -1,6 +1,6 @@
 import { upgradeMission, type MissionDef } from '../sim/content.ts';
 
-export { agentTemplate, makeContent, recruitNames, weapons } from './data.ts';
+export { agentKit, agentTemplate, makeContent, recruitNames, weapons } from './data.ts';
 
 export interface MissionEntry {
   id: string;

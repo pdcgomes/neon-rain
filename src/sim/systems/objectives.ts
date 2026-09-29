@@ -29,6 +29,17 @@ export function objectiveTargets(world: World, o: ObjectiveDef): (Entity | undef
   });
 }
 
+/** People the squad still has to persuade: agents never pick them as targets on their own. */
+export function persuadeTargetIds(world: World): Set<number> {
+  const out = new Set<number>();
+  const list = world.content.mission.objectives;
+  for (let k = world.objectiveIdx; k < list.length; k++) {
+    if (list[k].type !== 'persuade') continue;
+    for (const e of objectiveTargets(world, list[k])) if (e && e.alive && e.faction !== 'player') out.add(e.id);
+  }
+  return out;
+}
+
 export function currentObjective(world: World): ObjectiveDef | undefined {
   return world.content.mission.objectives[world.objectiveIdx];
 }

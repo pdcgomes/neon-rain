@@ -49,6 +49,8 @@ export interface Entity {
   hp: number;
   maxHp: number;
   armor: number;
+  /** Chest mod version, 0 (none) to 3; V2 and up self-repair. */
+  chest: number;
   alive: boolean;
   deadAt: number;
   lastDamagedAt: number;
@@ -57,7 +59,8 @@ export interface Entity {
   weaponIdx: number;
   cooldown: number;
   spin: number;
-  ammo: number;
+  /** Rounds left per weapon id, for weapons with limited ammo; a weapon not listed is full. */
+  ammo: Record<string, number>;
   grenades: number;
   holstered: boolean;
   lastShotAt: number;
@@ -80,7 +83,12 @@ export interface Entity {
 
   team: number;
   slot: number;
+  /** IPA dose per drug, 0..1, as set on the bars; it wears off toward `ipaDep`. */
   ipa: Ipa;
+  /** Dependency (the bars' centre line): the dose that does nothing. Creeps toward the dose. */
+  ipaDep: Ipa;
+  /** How far each dose has taken hold (the bars' dark segment); cosmetic lag behind the dose. */
+  ipaEff: Ipa;
   overdrive: boolean;
 
   ai: AiState;
@@ -128,6 +136,8 @@ export interface Projectile {
   ttl: number;
   fuse: number;
   landed: boolean;
+  /** For piercing shots: everyone already hit, so each takes the damage once. */
+  pierced?: number[];
 }
 
 export type SimEvent =

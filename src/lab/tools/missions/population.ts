@@ -1,4 +1,4 @@
-import { agentTemplate, makeContent } from '../../../content/data.ts';
+import { agentKit, makeContent } from '../../../content/data.ts';
 import type { SpawnDef, SpawnKind } from '../../../sim/content.ts';
 import { World } from '../../../sim/world.ts';
 import type { MissionDoc } from './doc.ts';
@@ -14,7 +14,8 @@ export function bakePopulation(doc: MissionDoc): void {
     delete m.spawns;
     return;
   }
-  const squad = ['A', 'B', 'C', 'D'].map((name) => ({ ...agentTemplate, loadout: [...agentTemplate.loadout], name }));
+  const kit = agentKit(0);
+  const squad = ['A', 'B', 'C', 'D'].map((name) => ({ ...kit, loadout: [...kit.loadout], name }));
   const world = new World(makeContent({ ...doc.toMission(), spawns: undefined }), squad);
   const counts: Record<string, number> = {};
   const spawns: SpawnDef[] = [];

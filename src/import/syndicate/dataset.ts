@@ -119,6 +119,8 @@ export class SyndDataset {
       res.mission.id = `${this.info.key}_${pad2(n)}`;
       res.mission.city = res.mission.city.replace('Syndicate', this.info.label);
     }
+    // American Revolt's enemies "react at least twice as fast as anything encountered before".
+    if (this.info.key === 'revolt') res.mission.enemyReaction = 0.5;
     return res;
   }
 }

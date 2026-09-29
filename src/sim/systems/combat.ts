@@ -1,3 +1,4 @@
+import { balance } from '../balance.ts';
 import type { WeaponDef } from '../content.ts';
 import { DT } from '../time.ts';
 import type { Entity, Projectile } from '../types.ts';
@@ -8,44 +9,55 @@ const GRAVITY = 22;
 const MUZZLE = 0.55;
 const SHOT_HEIGHT = 1.25;
 
+/** Rounds left in a limited-ammo weapon (a full magazine until it has been fired). */
+export function roundsLeft(e: Entity, weaponId: string, w: WeaponDef): number {
+  return e.ammo[weaponId] ?? w.ammo;
+}
+
 function fireOne(world: World, e: Entity, w: WeaponDef, weaponId: string): void {
   const ang0 = Math.atan2(e.aimY - e.y, e.aimX - e.x);
-  const npcSpread = e.kind === 'agent' || e.faction === 'player' ? 1 : 1.7;
-  const ang = ang0 + (world.rng.next() - 0.5) * 2 * w.spread * spreadMul(e) * npcSpread;
-  const dx = Math.cos(ang);
-  const dy = Math.sin(ang);
-  let sx = e.x + dx * MUZZLE;
-  let sy = e.y + dy * MUZZLE;
-  if (world.nav.isBlockedAt(sx, sy)) {
-    sx = e.x;
-    sy = e.y;
+  const player = e.kind === 'agent' || e.faction === 'player';
+  const spread = w.spread * spreadMul(e) * (player ? (e.firing ? 1 : balance.autoFireSpread) : balance.npcSpread);
+  let first: { x: number; y: number; dx: number; dy: number } | null = null;
+  for (let k = 0; k < w.pellets; k++) {
+    const ang = ang0 + (world.rng.next() - 0.5) * 2 * spread;
+    const dx = Math.cos(ang);
+    const dy = Math.sin(ang);
+    let sx = e.x + dx * MUZZLE;
+    let sy = e.y + dy * MUZZLE;
+    if (world.nav.isBlockedAt(sx, sy)) {
+      sx = e.x;
+      sy = e.y;
+    }
+    const p: Projectile = {
+      id: world.projectileSeq++,
+      kind: w.type === 'rocket' ? 'rocket' : 'bullet',
+      weapon: weaponId,
+      x: sx,
+      y: sy,
+      z: SHOT_HEIGHT,
+      px: sx,
+      py: sy,
+      pz: SHOT_HEIGHT,
+      vx: dx * w.speed,
+      vy: dy * w.speed,
+      vz: 0,
+      ownerId: e.id,
+      faction: e.faction,
+      damage: player ? w.damage : w.damage * balance.npcDamage,
+      splash: w.splash,
+      ttl: w.range / w.speed,
+      fuse: 0,
+      landed: false,
+      pierced: w.pierce ? [] : undefined,
+    };
+    world.projectiles.push(p);
+    if (e.kind === 'agent') world.stats.shotsFired++;
+    first ??= { x: sx, y: sy, dx, dy };
   }
-  const p: Projectile = {
-    id: world.projectileSeq++,
-    kind: w.type === 'rocket' ? 'rocket' : 'bullet',
-    weapon: weaponId,
-    x: sx,
-    y: sy,
-    z: SHOT_HEIGHT,
-    px: sx,
-    py: sy,
-    pz: SHOT_HEIGHT,
-    vx: dx * w.speed,
-    vy: dy * w.speed,
-    vz: 0,
-    ownerId: e.id,
-    faction: e.faction,
-    damage: w.damage,
-    splash: w.splash,
-    ttl: w.range / w.speed,
-    fuse: 0,
-    landed: false,
-  };
-  world.projectiles.push(p);
   e.lastShotAt = world.time;
-  if (e.kind === 'agent') world.stats.shotsFired++;
-  if (w.ammo > 0) e.ammo--;
-  world.emit({ t: 'shot', x: sx, y: sy, dx, dy, weapon: weaponId, owner: e.id, faction: e.faction });
+  if (w.ammo > 0) e.ammo[weaponId] = roundsLeft(e, weaponId, w) - 1;
+  if (first) world.emit({ t: 'shot', ...first, weapon: weaponId, owner: e.id, faction: e.faction });
   world.noise(e.x, e.y, w.noise, e.id);
 }
 
@@ -108,7 +120,7 @@ export function combatSystem(world: World): void {
       e.spin = Math.min(w.spinup, e.spin + DT);
       if (e.spin < w.spinup) continue;
     }
-    if (w.ammo > 0 && e.ammo <= 0) continue;
+    if (w.ammo > 0 && roundsLeft(e, weaponId, w) <= 0) continue;
     let guard = 0;
     while (e.cooldown <= 0 && guard++ < 4) {
       fireOne(world, e, w, weaponId);
@@ -142,6 +154,19 @@ function segmentHit(ax: number, ay: number, bx: number, by: number, cx: number, 
   return -1;
 }
 
+/** How much of a body at (x, y), 0..1, is hidden from a shot travelling along (dx, dy) by nearby walls. */
+export function coverAt(world: World, x: number, y: number, radius: number, dx: number, dy: number): number {
+  const reach = balance.coverReach;
+  const r = radius * 0.9;
+  let hidden = 0;
+  for (const side of [-1, 1]) {
+    const ex = x - dy * r * side;
+    const ey = y + dx * r * side;
+    if (world.nav.raycast(ex, ey, ex - dx * reach, ey - dy * reach) < 1) hidden += 0.5;
+  }
+  return hidden;
+}
+
 export function projectileSystem(world: World): void {
   const keep: Projectile[] = [];
   for (const p of world.projectiles) {
@@ -159,7 +184,7 @@ export function projectileSystem(world: World): void {
     const my = (p.y + ny) / 2;
     const reach = Math.hypot(nx - p.x, ny - p.y) / 2 + 1;
     world.query(mx, my, reach, (e) => {
-      if (!canHit(p, e)) return;
+      if (!canHit(p, e) || p.pierced?.includes(e.id)) return;
       const t = segmentHit(p.x, p.y, nx, ny, e.x, e.y, e.radius + 0.12);
       if (t >= 0 && t < hitT && t <= wallT) {
         hitT = t;
@@ -171,13 +196,26 @@ export function projectileSystem(world: World): void {
       const target = hitE as Entity;
       p.x += (nx - p.x) * hitT;
       p.y += (ny - p.y) * hitT;
+      if (p.kind === 'bullet' && balance.coverBlock > 0) {
+        const speed = Math.hypot(p.vx, p.vy) || 1;
+        const hidden = coverAt(world, target.x, target.y, target.radius, p.vx / speed, p.vy / speed);
+        if (hidden > 0 && world.rng.next() < hidden * balance.coverBlock) {
+          world.emit({ t: 'impact', x: p.x, y: p.y });
+          continue;
+        }
+      }
       const owner = world.get(p.ownerId);
       if (owner?.kind === 'agent') world.stats.shotsHit++;
       if (p.kind === 'rocket') world.explode(p.x, p.y, p.splash, p.damage, p.ownerId);
       else {
         target.vx += p.vx * 0.02;
         target.vy += p.vy * 0.02;
+        target.cooldown = Math.max(target.cooldown, balance.hitStagger);
         world.damage(target, p.damage, p.ownerId);
+        if (p.pierced) {
+          p.pierced.push(target.id);
+          keep.push(p);
+        }
       }
       continue;
     }

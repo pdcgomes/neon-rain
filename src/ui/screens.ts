@@ -1,6 +1,16 @@
+import { CHEST_ARMOR } from '../sim/balance.ts';
 import type { MissionDef } from '../sim/content.ts';
 import type { MissionStats } from '../sim/types.ts';
+import { agentKit, weapons } from '../content/index.ts';
 import type { FallenAgent, Save } from './roster.ts';
+
+function loadoutText(save: Save): string {
+  const kit = agentKit(save.wins);
+  const items = kit.loadout.map((id) => weapons[id]?.name ?? id);
+  if (kit.grenades) items.push(`${kit.grenades}× Frag Grenade`);
+  if (kit.chest) items.push(`Chest V${kit.chest} (${Math.round(CHEST_ARMOR[kit.chest] * 100)}% armour)`);
+  return items.join(' · ');
+}
 
 const root = () => document.getElementById('screens')!;
 
@@ -76,7 +86,7 @@ export function showBriefing(mission: MissionDef, save: Save, onDeploy: () => vo
         <div class="h">ASSIGNED AGENTS</div>
         ${squad}
         <div class="h">LOADOUT</div>
-        <div class="brief-load">Pistol · Uzi · Minigun · Persuadertron · 2× Frag Grenade</div>
+        <div class="brief-load">${loadoutText(save)}</div>
         <div class="h">CONTROLS</div>
         <div class="brief-controls">
           <div><b>Left click</b> move (hold to steer)</div>

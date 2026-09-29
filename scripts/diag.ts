@@ -16,7 +16,7 @@ const t = world.get(world.targetId)!;
 const drawn = process.argv.includes('--drawn');
 world.step([
   { type: 'move', agents: world.agentIds, x: t.x - 14, y: t.y + 6 },
-  ...(drawn ? [{ type: 'weapon' as const, agents: world.agentIds, slot: 2 }] : []),
+  ...(drawn ? [{ type: 'weapon' as const, agents: world.agentIds, slot: 0 }] : []),
 ]);
 const agentSet = new Set(world.agentIds);
 for (let i = 0; i < 30 * 30; i++) {
