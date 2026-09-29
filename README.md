@@ -493,6 +493,10 @@ The Lab's *Original tiles* layer shows the source classification underneath the 
 - Online co-op, with the sim running on an authoritative Node server.
 - Port to Godot or Unity for native rendering and DLSS/FSR. A Godot project scaffold is already in the repo root.
 
+## License
+
+The code and original content are released under the [MIT License](LICENSE). Third-party models and animations in `public/lab/assets/mixamo/` and `public/lab/assets/tripo/` are not covered by it and remain under the terms of the services that produced them.
+
 ## Disclaimer
 
 A non-commercial fan project. Not affiliated with or endorsed by Electronic Arts, Bullfrog Productions, or Sensible Software. Syndicate and Cannon Fodder are trademarks of their respective owners.

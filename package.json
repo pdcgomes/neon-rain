@@ -2,6 +2,7 @@
   "name": "syndicate-reborn",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "A modern reinterpretation of Syndicate with Cannon Fodder-style fluid controls.",
   "type": "module",
   "scripts": {
