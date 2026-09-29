@@ -19,6 +19,7 @@ import { loadMission } from './balance/missionRun.ts';
 import { missionFile, winsFor } from './balance/missions.ts';
 import { TICK_HZ, World } from '../src/sim/world.ts';
 import { Recorder, replay, type Recording } from '../src/sim/telemetry.ts';
+import { agentsLost, ipaUse, killerOf, outcomeOf, summarise } from '../src/sim/telemetryAnalysis.ts';
 
 const dir = new URL('../content-local/telemetry/', import.meta.url).pathname;
 const argv = process.argv.slice(2);
@@ -53,9 +54,9 @@ function sessions(filters: string[]): Session[] {
   });
 }
 
-const outcome = (r: Recording) => (r.result.abandoned ? 'abandoned' : r.result.phase === 'success' ? 'win' : r.result.phase === 'fail' ? 'loss' : 'timeout');
-const lost = (r: Recording) => r.deaths.filter((d) => d.kind === 'agent').length;
-const killer = (d: Recording['deaths'][number]) => (d.by ? `${d.by.name || d.by.kind}:${d.by.weapon || '?'}` : 'unknown');
+const outcome = outcomeOf;
+const lost = agentsLost;
+const killer = killerOf;
 
 // ------------------------------------------------------------------ list
 
@@ -72,61 +73,20 @@ function list(ss: Session[]): void {
 
 // ------------------------------------------------------------------ summary
 
-function tally<T>(items: T[], key: (t: T) => string, weight: (t: T) => number = () => 1): [string, number][] {
-  const m = new Map<string, number>();
-  for (const it of items) m.set(key(it), (m.get(key(it)) ?? 0) + weight(it));
-  return [...m].sort((a, b) => b[1] - a[1]);
-}
-
-/** Share of samples in which an agent's dose on a bar sat above (boost) or below (dull) its dependency. */
-function ipaUse(recs: Recording[]) {
-  const out = { a: { dose: 0, boost: 0, dull: 0 }, p: { dose: 0, boost: 0, dull: 0 }, i: { dose: 0, boost: 0, dull: 0 }, dep: 0, overdrive: 0, n: 0 };
-  for (const r of recs) {
-    for (const s of r.samples) {
-      for (const a of s.agents) {
-        if (a.hp <= 0) continue;
-        out.n++;
-        for (const ch of ['a', 'p', 'i'] as const) {
-          out[ch].dose += a.ipa[ch];
-          if (a.ipa[ch] > a.dep[ch] + 0.05) out[ch].boost++;
-          if (a.ipa[ch] < a.dep[ch] - 0.05) out[ch].dull++;
-        }
-        out.dep += (a.dep.a + a.dep.p + a.dep.i) / 3;
-        if (a.overdrive) out.overdrive++;
-      }
-    }
-  }
-  const n = out.n || 1;
-  return {
-    bars: (['a', 'p', 'i'] as const).map((ch) => ({ ch, dose: out[ch].dose / n, boost: out[ch].boost / n, dull: out[ch].dull / n })),
-    dependency: out.dep / n,
-    overdrive: out.overdrive / n,
-  };
-}
-
 function summary(ss: Session[]): void {
   const byMission = new Map<string, Recording[]>();
   for (const { rec } of ss) byMission.set(rec.missionId, [...(byMission.get(rec.missionId) ?? []), rec]);
   const json: Record<string, unknown> = {};
   for (const [id, recs] of byMission) {
-    const played = recs.filter((r) => !r.result.abandoned);
-    const wins = played.filter((r) => r.result.phase === 'success').length;
-    const deaths = recs.flatMap((r) => r.deaths.filter((d) => d.kind === 'agent'));
-    const damage = tally(recs.flatMap((r) => Object.values(r.damage).flatMap((m) => Object.entries(m))), ([k]) => k, ([, v]) => v);
-    const shots = tally(recs.flatMap((r) => Object.values(r.shots).flatMap((m) => Object.entries(m))), ([k]) => k, ([, v]) => v.ordered + v.own);
-    const own = recs.flatMap((r) => Object.values(r.shots).flatMap((m) => Object.values(m)));
-    const ownShare = own.reduce((s, v) => s + v.own, 0) / Math.max(1, own.reduce((s, v) => s + v.own + v.ordered, 0));
-    const hits = recs.reduce((s, r) => s + r.result.stats.shotsHit, 0) / Math.max(1, recs.reduce((s, r) => s + r.result.stats.shotsFired, 0));
-    const ipa = ipaUse(recs);
-    const firstContact = played.map((r) => r.marks.find((m) => m.what === 'alarm')?.tick).filter((t): t is number => t !== undefined);
-    const m = recs[0].mission;
-    console.log(`\n${id} ${m.codename}: ${recs.length} session${recs.length === 1 ? '' : 's'} (${recs.length - played.length} abandoned), ${recs.map((r) => r.player).filter((p, i, a) => a.indexOf(p) === i).join(', ')}`);
-    console.log(`  wins ${wins}/${played.length}   agents lost ${(deaths.length / Math.max(1, recs.length)).toFixed(1)} a session   time ${secs(played.reduce((s, r) => s + r.result.ticks, 0) / Math.max(1, played.length))}   alarm at ${firstContact.length ? secs(firstContact.reduce((a, b) => a + b, 0) / firstContact.length) : '-'}`);
-    console.log(`  agents killed by: ${tally(deaths, killer).slice(0, 5).map(([k, n]) => `${k} ×${n}`).join(', ') || '-'}`);
-    console.log(`  damage taken from: ${damage.slice(0, 5).map(([k, v]) => `${k} ${Math.round(v)}`).join(', ') || '-'}`);
-    console.log(`  shots: ${shots.slice(0, 5).map(([k, n]) => `${k} ${n}`).join(', ') || '-'}   hit rate ${pct(hits)}   fired on the agents' own ${pct(ownShare)}`);
-    console.log(`  IPA: ${ipa.bars.map((b) => `${b.ch.toUpperCase()} dose ${b.dose.toFixed(2)} (boosted ${pct(b.boost)}, dulled ${pct(b.dull)})`).join('  ')}   dependency ${ipa.dependency.toFixed(2)}   overdrive ${pct(ipa.overdrive)}`);
-    json[id] = { sessions: recs.length, played: played.length, wins, lostPerSession: deaths.length / recs.length, killers: tally(deaths, killer), damage, shots, hitRate: hits, ownShare, ipa };
+    const s = summarise(recs);
+    const who = recs.map((r) => r.player).filter((p, i, a) => a.indexOf(p) === i).join(', ');
+    console.log(`\n${id} ${recs[0].mission.codename}: ${s.sessions} session${s.sessions === 1 ? '' : 's'} (${s.sessions - s.played} abandoned), ${who}`);
+    console.log(`  wins ${s.wins}/${s.played}   agents lost ${s.lostPerSession.toFixed(1)} a session   time ${Math.round(s.seconds)}s   alarm at ${s.alarmAt === null ? '-' : `${Math.round(s.alarmAt)}s`}`);
+    console.log(`  agents killed by: ${s.killers.slice(0, 5).map(([k, n]) => `${k} ×${n}`).join(', ') || '-'}`);
+    console.log(`  damage taken from: ${s.damage.slice(0, 5).map(([k, v]) => `${k} ${Math.round(v)}`).join(', ') || '-'}`);
+    console.log(`  shots: ${s.shots.slice(0, 5).map(([k, n]) => `${k} ${n}`).join(', ') || '-'}   hit rate ${pct(s.hitRate)}   fired on the agents' own ${pct(s.ownFire)}`);
+    console.log(`  IPA: ${s.ipa.bars.map((b) => `${b.ch.toUpperCase()} dose ${b.dose.toFixed(2)} (boosted ${pct(b.boost)}, dulled ${pct(b.dull)})`).join('  ')}   dependency ${s.ipa.dependency.toFixed(2)}   overdrive ${pct(s.ipa.overdrive)}`);
+    json[id] = s;
   }
   if (flag('json')) console.log(JSON.stringify(json, null, 1));
 }

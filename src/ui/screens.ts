@@ -53,13 +53,7 @@ export interface MissionPicker {
   pick(id: string): void;
 }
 
-/** Telemetry recordings that can be watched (dev server only). */
-export interface ReplayPicker {
-  list(): Promise<string[]>;
-  watch(name: string): void;
-}
-
-export function showBriefing(mission: MissionDef, save: Save, onDeploy: () => void, onChar: (ch: string) => void, picker?: MissionPicker, replays?: ReplayPicker): void {
+export function showBriefing(mission: MissionDef, save: Save, onDeploy: () => void, onChar: (ch: string) => void, picker?: MissionPicker): void {
   const pickerHtml =
     picker && picker.list.length > 1
       ? `<div class="h">OPERATION</div>
@@ -108,8 +102,7 @@ export function showBriefing(mission: MissionDef, save: Save, onDeploy: () => vo
           <div><b>Wheel</b> zoom · <b>WASD</b> pan · <b>F</b> reset view</div>
         </div>
         <div class="brief-memorial">Memorial Wall: ${save.fallen.length} agent${save.fallen.length === 1 ? '' : 's'} decommissioned</div>
-        <label class="brief-telemetry" title="Saves a replay of each mission for balance analysis (scripts/telemetry.ts)"><input type="checkbox"${telemetryEnabled() ? ' checked' : ''}> Record telemetry</label>
-        ${replays ? `<select class="replay-pick" title="Watch a recorded mission"><option value="">Watch a replay…</option></select>` : ''}
+        <label class="brief-telemetry" title="Saves a replay of each mission for balance analysis (the Lab's Telemetry tool, npm run telemetry)"><input type="checkbox"${telemetryEnabled() ? ' checked' : ''}> Record telemetry</label>
         <button class="btn deploy">DEPLOY ▸</button>
         <div class="hint">Press Enter to deploy</div>
       </div>
@@ -160,19 +153,6 @@ export function showBriefing(mission: MissionDef, save: Save, onDeploy: () => vo
   window.addEventListener('keydown', onKey);
   d.querySelector('.deploy')!.addEventListener('click', go);
   d.querySelector<HTMLInputElement>('.brief-telemetry input')!.addEventListener('change', (e) => setTelemetry((e.target as HTMLInputElement).checked));
-  const replayPick = d.querySelector<HTMLSelectElement>('.replay-pick');
-  if (replays && replayPick) {
-    void replays.list().then((names) => {
-      for (const n of names) replayPick.add(new Option(n.replace(/\.json$/, '').replace(/^(\d{4}-\d\d-\d\d)T(\d\d)-(\d\d)-[\d-]+Z_/, '$1 $2:$3 '), n));
-    });
-    replayPick.addEventListener('change', () => {
-      if (!replayPick.value) return;
-      window.clearInterval(timer);
-      window.removeEventListener('keydown', onKey);
-      clear();
-      replays.watch(replayPick.value);
-    });
-  }
   d.querySelector<HTMLSelectElement>('.mission-pick')?.addEventListener('change', (e) => {
     window.clearInterval(timer);
     window.removeEventListener('keydown', onKey);

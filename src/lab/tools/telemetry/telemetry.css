@@ -1,0 +1,290 @@
+/* Telemetry tool: recordings, replay viewport with timeline, and analysis panes. Shares the Lab's variables. */
+.tm {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 320px;
+  height: 100%;
+}
+.tm-left,
+.tm-right {
+  background: var(--pane-solid);
+  overflow: auto;
+  padding: 10px 10px 20px;
+}
+.tm-left {
+  border-right: 1px solid rgba(0, 0, 0, 0.6);
+}
+.tm-right {
+  border-left: 1px solid rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tm-filter {
+  width: 100%;
+  margin-bottom: 8px;
+}
+.tm-rec {
+  display: block;
+  padding: 6px 8px;
+}
+.tm-rec div {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+.tm-rec small {
+  color: var(--text-3);
+  font: 11px var(--mono);
+}
+.tm-rec.selected small,
+.tm-rec.selected .tm-out {
+  color: rgba(255, 255, 255, 0.85);
+}
+.tm-summary .kv {
+  grid-template-columns: minmax(90px, auto) 1fr;
+}
+.tm-summary .kv span {
+  overflow-wrap: anywhere;
+}
+.tm-out {
+  font: 10px var(--mono);
+  color: var(--text-2);
+}
+.tm-out.success {
+  color: var(--ok);
+}
+.tm-out.fail {
+  color: var(--bad);
+}
+.tm-out.abandoned {
+  color: var(--warn);
+}
+
+.tm-center {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  background: #000;
+}
+.tm-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--pane-solid);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.6);
+  flex-wrap: wrap;
+}
+.tm-layers {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.tm-spacer {
+  flex: 1;
+}
+.tm .chip {
+  font: 11px var(--font);
+  color: var(--text-2);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  padding: 2px 9px;
+  cursor: default;
+}
+.tm .chip.on {
+  color: #fff;
+  background: var(--accent);
+  border-color: transparent;
+}
+.tm-view {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+.tm-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.tm-view .replay-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.tm-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+}
+.tm-timeline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--pane-solid);
+  border-top: 1px solid rgba(0, 0, 0, 0.6);
+}
+.tm-time {
+  font: 12px var(--mono);
+  color: var(--text-2);
+  width: 90px;
+}
+.tm-track {
+  position: relative;
+  flex: 1;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+}
+.tm-chart {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.tm-marks i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+}
+.tm-marks i.alarm {
+  background: var(--warn);
+}
+.tm-marks i.obj {
+  background: var(--ok);
+}
+.tm-marks i.death {
+  background: var(--bad);
+  width: 3px;
+}
+.tm-pos {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+}
+
+.tm-tabs {
+  align-self: flex-start;
+}
+.tm-pane[hidden] {
+  display: none;
+}
+.tm-log-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.tm-log-list {
+  display: grid;
+  gap: 1px;
+}
+.tm-ev {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  color: var(--text-3);
+  cursor: default;
+}
+.tm-ev:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.tm-ev.past {
+  color: var(--text);
+}
+.tm-ev.now {
+  background: var(--accent-soft);
+}
+.tm-ev .t {
+  font: 11px var(--mono);
+  color: var(--text-3);
+}
+.tm-ev.death span:last-child,
+.tm-ev.end span:last-child {
+  color: var(--bad);
+}
+.tm-ev.hit span:last-child {
+  color: #ff9f5a;
+}
+.tm-ev.alarm span:last-child,
+.tm-ev.police span:last-child {
+  color: var(--warn);
+}
+.tm-ev.objective span:last-child {
+  color: var(--ok);
+}
+.tm-ev.comms span:last-child {
+  color: var(--text-2);
+  font-style: italic;
+}
+.tm-agent.dead {
+  opacity: 0.5;
+}
+.tm-hp {
+  height: 5px;
+  margin: 4px 0;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.tm-hp i {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+}
+.tm-ipa {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  align-items: center;
+  gap: 6px;
+  font: 10px var(--mono);
+  color: var(--text-3);
+  margin-top: 3px;
+}
+.tm-ipa-track {
+  position: relative;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+}
+.tm-ipa-track i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+.tm-ipa-track b {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+}
+.tm-sparks {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+.tm-sparks canvas {
+  width: 100%;
+  height: 48px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}

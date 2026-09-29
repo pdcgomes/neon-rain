@@ -203,17 +203,56 @@ export function replay(rec: Recording, onStep?: (world: World) => void, override
   const saved = { ...balance };
   Object.assign(balance, rec.balance, overrides);
   try {
-    const content: Content = { weapons: rec.weapons, agents: [], mission: rec.mission };
-    const world = new World(content, rec.squad, rec.seed);
-    let next = 0;
-    // The game keeps stepping for a few seconds after a mission ends, so run to the recorded tick.
-    while (world.tick < rec.result.ticks) {
-      let cmds: Command[] = [];
-      if (next < rec.commands.length && rec.commands[next][0] === world.tick) cmds = rec.commands[next++][1];
-      world.step(cmds);
-      onStep?.(world);
+    const p = new Playback(rec);
+    while (!p.done) {
+      p.step();
+      onStep?.(p.world);
     }
-    return world;
+    return p.world;
+  } finally {
+    Object.assign(balance, saved);
+  }
+}
+
+/**
+ * A recording being played one tick at a time, from tick 0. The caller sets `balance` to the
+ * recording's knobs for as long as it steps (see `withBalance`). To go back, start a new one.
+ */
+export class Playback {
+  readonly rec: Recording;
+  readonly world: World;
+  private next = 0;
+
+  constructor(rec: Recording) {
+    this.rec = rec;
+    const content: Content = { weapons: rec.weapons, agents: [], mission: rec.mission };
+    this.world = new World(content, rec.squad, rec.seed);
+  }
+
+  /** The game keeps stepping for a few seconds after a mission ends, so this runs to the recorded tick. */
+  get done(): boolean {
+    return this.world.tick >= this.rec.result.ticks;
+  }
+
+  step(): void {
+    const c = this.rec.commands;
+    let cmds: Command[] = [];
+    if (this.next < c.length && c[this.next][0] === this.world.tick) cmds = c[this.next++][1];
+    this.world.step(cmds);
+  }
+
+  /** At the end: does the replay reproduce the recording exactly? */
+  get faithful(): boolean {
+    return this.done && this.world.checksum() === this.rec.result.checksum;
+  }
+}
+
+/** Sets the balance knobs to a recording's for as long as `fn` runs (sync), then restores them. */
+export function withBalance<T>(rec: Recording, fn: () => T): T {
+  const saved = { ...balance };
+  Object.assign(balance, rec.balance);
+  try {
+    return fn();
   } finally {
     Object.assign(balance, saved);
   }

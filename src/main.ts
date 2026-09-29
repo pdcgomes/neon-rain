@@ -7,8 +7,6 @@ import type { Content } from './sim/content.ts';
 import { loadSave, recordMission, squadFromSave } from './ui/roster.ts';
 import { hideScreens, showBriefing, showDebrief, showLoading, showPause } from './ui/screens.ts';
 import { saveRecording, telemetryEnabled } from './ui/telemetry.ts';
-import { ReplayViewer } from './replay/viewer.ts';
-import type { Recording } from './sim/telemetry.ts';
 
 const app = document.getElementById('app')!;
 const audio = new AudioSystem();
@@ -87,7 +85,7 @@ function briefing(): void {
     list: missions.map((m) => ({ id: m.id, local: m.source === 'local' })),
     current: missionId,
     pick: (id) => void selectMission(id).then(briefing),
-  }, import.meta.env.DEV ? { list: () => fetch('/__telemetry/list').then((r) => (r.ok ? r.json() : [])), watch: (name) => void watch(name) } : undefined);
+  });
 }
 
 const recorded = new WeakSet<Game>();
@@ -114,29 +112,5 @@ function debrief(r: GameResult): void {
   });
 }
 
-/** Plays back a telemetry recording (dev server): ?replay=<file in content-local/telemetry>. */
-async function watch(name: string): Promise<void> {
-  const q = new URLSearchParams(location.search);
-  q.set('replay', name);
-  history.replaceState(null, '', `${location.pathname}?${q}`);
-  const res = await fetch(`/__telemetry/file?name=${encodeURIComponent(name)}`);
-  if (!res.ok) {
-    console.warn(`replay ${name}: ${res.status}`);
-    return briefing();
-  }
-  const rec = (await res.json()) as Recording;
-  await preloadAgentArt();
-  hideScreens();
-  const viewer = new ReplayViewer(app, rec, () => {
-    const q = new URLSearchParams(location.search);
-    q.delete('replay');
-    history.replaceState(null, '', `${location.pathname}${q.toString() ? `?${q}` : ''}`);
-    briefing();
-  });
-  (window as unknown as { replay: ReplayViewer }).replay = viewer;
-  await viewer.start();
-}
-
-if (params.has('replay')) void watch(params.get('replay')!);
-else if (params.has('autostart')) void deploy();
+if (params.has('autostart')) void deploy();
 else briefing();

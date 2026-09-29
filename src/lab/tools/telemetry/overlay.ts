@@ -1,18 +1,27 @@
 import * as THREE from 'three';
-import type { GameRenderer } from '../render/renderer.ts';
-import { sightRange } from '../sim/systems/ai.ts';
-import type { Recording } from '../sim/telemetry.ts';
-import type { World } from '../sim/world.ts';
+import type { GameRenderer } from '../../../render/renderer.ts';
+import { sightRange } from '../../../sim/systems/ai.ts';
+import type { Recording } from '../../../sim/telemetry.ts';
+import type { Timeline } from '../../../sim/telemetryAnalysis.ts';
+import type { World } from '../../../sim/world.ts';
 
-export type Layer = 'trails' | 'deaths' | 'vision' | 'aim' | 'labels';
+export type Layer = 'trails' | 'enemies' | 'hits' | 'deaths' | 'vision' | 'aim' | 'labels';
 
-export const LAYERS: { id: Layer; key: string; label: string }[] = [
-  { id: 'trails', key: 'KeyT', label: 'Trails' },
-  { id: 'deaths', key: 'KeyK', label: 'Deaths' },
-  { id: 'vision', key: 'KeyV', label: 'Vision' },
-  { id: 'aim', key: 'KeyL', label: 'Aim' },
-  { id: 'labels', key: 'KeyN', label: 'Labels' },
+export const LAYERS: { id: Layer; key: string; label: string; title: string }[] = [
+  { id: 'trails', key: 'KeyT', label: 'Trails', title: 'Where each agent has been (T)' },
+  { id: 'enemies', key: 'KeyR', label: 'Hunters', title: 'Paths of enemies while they hunted the squad (R)' },
+  { id: 'hits', key: 'KeyH', label: 'Hits', title: 'Where agents were hit, with a line to the shooter (H)' },
+  { id: 'deaths', key: 'KeyK', label: 'Deaths', title: 'Agent deaths, with a line to the killer (K)' },
+  { id: 'vision', key: 'KeyV', label: 'Vision', title: 'How far each nearby enemy sees: amber calm, red alerted, blue police (V)' },
+  { id: 'aim', key: 'KeyL', label: 'Aim', title: 'Aim lines: solid on the player\'s order, dashed on the agent\'s own (L)' },
+  { id: 'labels', key: 'KeyN', label: 'Labels', title: 'Names, health and IPA (N)' },
 ];
+
+/** Replay-wide data from the analysis pass, for the layers the live world can't show. */
+export interface OverlayData {
+  hits: Timeline['hits'];
+  enemyTrails: Timeline['enemyTrails'];
+}
 
 const AGENT_COLORS = ['#5ad7ff', '#ffd24d', '#7dff9a', '#ff8ad8'];
 /** Enemies further than this from the camera focus aren't drawn in the vision layer. */
@@ -42,7 +51,7 @@ export class Overlay {
     return [((this.v.x + 1) / 2) * this.canvas.clientWidth, ((1 - this.v.y) / 2) * this.canvas.clientHeight];
   }
 
-  draw(view: GameRenderer, world: World, rec: Recording): void {
+  draw(view: GameRenderer, world: World, rec: Recording, data?: OverlayData): void {
     const c = this.canvas;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     if (c.width !== Math.round(c.clientWidth * dpr) || c.height !== Math.round(c.clientHeight * dpr)) {
@@ -88,6 +97,44 @@ export class Overlay {
         }
         g.stroke();
         g.globalAlpha = 1;
+      }
+    }
+
+    if (this.on.has('enemies') && data) {
+      g.strokeStyle = 'rgba(255,90,90,0.55)';
+      for (const trail of data.enemyTrails.values()) {
+        g.beginPath();
+        let started = false;
+        for (const p of trail) {
+          if (p.tick > now) break;
+          const s = this.project(view, p.x, p.y, 0.05);
+          if (!s) continue;
+          if (started) g.lineTo(s[0], s[1]);
+          else g.moveTo(s[0], s[1]);
+          started = true;
+        }
+        g.stroke();
+      }
+    }
+
+    if (this.on.has('hits') && data) {
+      for (const h of data.hits) {
+        if (h.tick > now) continue;
+        const s = this.project(view, h.x, h.y, 0.1);
+        if (!s) continue;
+        const fresh = now - h.tick < 60;
+        const from = this.project(view, h.fromX, h.fromY, 1);
+        if (from && fresh) {
+          g.strokeStyle = 'rgba(255,150,60,0.7)';
+          g.beginPath();
+          g.moveTo(from[0], from[1]);
+          g.lineTo(s[0], s[1]);
+          g.stroke();
+        }
+        g.fillStyle = fresh ? 'rgba(255,120,40,0.95)' : 'rgba(255,120,40,0.45)';
+        g.beginPath();
+        g.arc(s[0], s[1], Math.min(9, 2 + h.amount / 12), 0, Math.PI * 2);
+        g.fill();
       }
     }
 

@@ -76,6 +76,10 @@ class ParticleSystem {
     this.list.push(p);
   }
 
+  clear(): void {
+    this.list = [];
+  }
+
   update(dt: number): void {
     let n = 0;
     const keep: Particle[] = [];
@@ -293,6 +297,15 @@ export class Fx {
     best.color.setHex(color);
     best.intensity = intensity;
     best.distance = dist;
+  }
+
+  /** Drops lingering particles and decals, for when the world they came from is replaced. */
+  clear(): void {
+    this.sparks.clear();
+    this.smoke.clear();
+    this.decals.count = 0;
+    this.decalIdx = 0;
+    for (const l of this.lights) l.intensity = 0;
   }
 
   private decal(x: number, z: number, size: number, color: THREE.Color): void {

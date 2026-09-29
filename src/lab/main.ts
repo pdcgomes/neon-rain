@@ -10,6 +10,7 @@ const tools: ToolEntry[] = [
   { id: 'art', title: 'Art', icon: 'person', load: async () => (await import('./tools/art/art.ts')).artTool },
   { id: 'missions', title: 'Missions', icon: 'map', load: async () => (await import('./tools/missions/missions.ts')).missionsTool },
   { id: 'import', title: 'Import', icon: 'download', load: async () => (await import('./tools/import/import.ts')).importTool },
+  { id: 'telemetry', title: 'Telemetry', icon: 'film', load: async () => (await import('./tools/telemetry/telemetry.ts')).telemetryTool },
 ];
 
 const host = new ToolHost(document.getElementById('appbar')!, document.getElementById('tool-root')!, stage, tools);

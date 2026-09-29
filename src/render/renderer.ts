@@ -146,13 +146,20 @@ export class GameRenderer {
     this.render(0, 0, 0, { selected: new Set(), cursor: null, aiming: false, overdrive: false });
   }
 
+  /** Draws a different world of the same mission, e.g. a replay rewound to its start. */
+  setWorld(world: World): void {
+    this.world = world;
+    this.fx.clear();
+  }
+
   get renderScale(): number {
     return this.post.scale;
   }
 
+  /** Fits the canvas's own size: the whole window in the game, a panel in the Lab. */
   resize(): void {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const w = this.canvas.clientWidth || window.innerWidth;
+    const h = this.canvas.clientHeight || window.innerHeight;
     this.rig.resize(w / h);
     this.post.setSize(w, h);
     this.fx.setViewportHeight(h * Math.min(window.devicePixelRatio || 1, 2) * this.post.scale);
