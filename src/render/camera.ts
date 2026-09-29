@@ -72,6 +72,14 @@ export class CameraRig {
     this.pan.set(0, 0, 0);
   }
 
+  /** Moves the focus itself by the current pan, so a free camera can travel the whole map. */
+  commitPan(): void {
+    this.focus.add(this.pan);
+    this.focus.x = THREE.MathUtils.clamp(this.focus.x, 4, this.bounds.w - 4);
+    this.focus.z = THREE.MathUtils.clamp(this.focus.z, 4, this.bounds.h - 4);
+    this.pan.set(0, 0, 0);
+  }
+
   shake(amount: number): void {
     this.shakeAmt = Math.min(1.5, this.shakeAmt + amount);
   }

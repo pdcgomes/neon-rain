@@ -72,6 +72,29 @@ function labSave(): Plugin {
       return [];
     },
     configureServer(server) {
+      // Gameplay telemetry recordings (see src/sim/telemetry.ts), for scripts/telemetry.ts.
+      server.middlewares.use('/__telemetry/', (req, res) => {
+        const url = new URL(req.url ?? '', 'http://x');
+        const dir = join(localDir, 'telemetry');
+        if (req.method === 'GET' && url.pathname === '/list') {
+          return void json(res, existsSync(dir) ? readdirSync(dir).filter((n) => n.endsWith('.json')).sort().reverse() : []);
+        }
+        const name = url.searchParams.get('name') ?? '';
+        if (!/^[\w.-]+\.json$/.test(name)) return void res.writeHead(400).end();
+        if (req.method === 'GET' && url.pathname === '/file') {
+          const path = join(dir, name);
+          if (!existsSync(path)) return void res.writeHead(404).end('not found');
+          return void res.writeHead(200, { 'content-type': 'application/json' }).end(readFileSync(path));
+        }
+        if (req.method !== 'POST' || url.pathname !== '/save') return void res.writeHead(400).end();
+        const chunks: Buffer[] = [];
+        req.on('data', (c: Buffer) => chunks.push(c));
+        req.on('end', () => {
+          mkdirSync(dir, { recursive: true });
+          writeFileSync(join(dir, name), Buffer.concat(chunks));
+          res.writeHead(200).end('ok');
+        });
+      });
       server.middlewares.use('/__lab/', (req, res) => {
         const url = new URL(req.url ?? '', 'http://x');
         if (req.method === 'GET') {

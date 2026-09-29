@@ -636,6 +636,148 @@ body {
   border-left: 1px solid var(--line);
   padding-left: 32px;
 }
+.replay-pick {
+  width: 100%;
+  margin-top: 8px;
+  padding: 5px 8px;
+  font: 12px 'Share Tech Mono', monospace;
+  color: var(--dim);
+  background: rgba(31, 244, 255, 0.04);
+  border: 1px solid var(--line);
+  outline: none;
+}
+
+/* Telemetry replay viewer: the game's weapon bar and controls help don't apply. */
+body.replaying #hud .weapons,
+body.replaying #hud .help {
+  display: none;
+}
+.replay-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+.replay-panel {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  width: min(980px, calc(100% - 24px));
+  padding: 8px 12px 10px;
+  z-index: 40;
+  font: 12px 'Share Tech Mono', monospace;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  cursor: default;
+}
+.replay-panel button {
+  font: inherit;
+  color: var(--text);
+  background: rgba(31, 244, 255, 0.06);
+  border: 1px solid var(--line);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.replay-panel button.on {
+  color: var(--ink);
+  background: var(--cyan);
+}
+.rp-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.rp-head b {
+  color: var(--pink);
+}
+.rp-verdict {
+  margin-left: auto;
+  color: var(--amber);
+}
+.rp-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.rp-time {
+  width: 92px;
+}
+.rp-track {
+  position: relative;
+  flex: 1;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+.rp-marks i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+}
+.rp-marks i.alarm {
+  background: var(--amber);
+}
+.rp-marks i.obj {
+  background: var(--cyan);
+}
+.rp-marks i.death {
+  background: var(--red);
+  width: 3px;
+}
+.rp-head-pos {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+}
+.rp-speed {
+  width: 36px;
+  text-align: right;
+  cursor: pointer;
+}
+.rp-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  margin-top: 7px;
+}
+.rp-tools span {
+  margin: 0 2px 0 8px;
+  color: var(--dim);
+}
+.rp-tools span:first-child {
+  margin-left: 0;
+}
+.rp-ipa {
+  display: flex;
+  gap: 8px;
+  margin-top: 7px;
+}
+.rp-spark {
+  position: relative;
+  background: rgba(0, 0, 0, 0.3);
+}
+.rp-spark canvas {
+  display: block;
+}
+.rp-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
 .mission-pick {
   width: 100%;
   margin-bottom: 14px;
@@ -684,6 +826,16 @@ body {
   font-family: 'Share Tech Mono', monospace;
   font-size: 12px;
   color: var(--pink);
+}
+.brief-telemetry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--dim);
+  cursor: pointer;
 }
 .btn {
   display: block;

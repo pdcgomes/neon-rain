@@ -54,6 +54,7 @@ Then open http://localhost:5173.
 | `npm run sim:smoke` | Play every mission headless in Node and verify determinism |
 | `npm run sim:traffic` | Check that cars stay on roads and calm pedestrians are never hit |
 | `npm run sim:balance` | Score difficulty: rush vs. tactical plans in small combat arenas |
+| `npm run telemetry` | Analyse recorded play sessions (see Telemetry and replays) |
 | `npm run lab:e2e` | Drive the Lab's mission editor and importer in headless Chrome (needs `npm run dev`) |
 | `npm run synd -- list` | List the original Syndicate missions found under `content-local/` |
 | `npm run synd:convert -- --all` | Convert every original mission into a playable local mission |
@@ -473,6 +474,13 @@ Every one of the 100 converted missions loads and runs deterministically in `sim
 - The original tile art: imported maps use Neon Rain's buildings.
 
 The Lab's *Original tiles* layer shows the source classification underneath the converted map, which helps when hand-fixing a conversion.
+
+## Telemetry and replays
+
+Tick "Record telemetry" on the briefing screen (or add `?telemetry=1` to the URL) and every mission you play is saved to `content-local/telemetry/` when it ends or you abort it. A production build downloads the file instead. The sim only changes through commands, so a recording holds everything needed to replay the mission exactly: the mission and weapon definitions, the squad's kit, the seed, the balance knobs, and each tick's commands. It also keeps a per-second sample of each agent (position, health, weapon, IPA doses and dependency) and a digest of what happened (deaths and who caused them, damage by source, shots by weapon, alarm and objective times), so most questions can be answered without replaying, even after the sim has changed.
+
+- `npm run telemetry` lists sessions. `summary [filter…]` groups them per mission: wins, agents lost, what killed them, where damage came from, weapon use and hit rate, how often agents fired on their own, and how the IPA bars were used. `deaths` lists every agent death with the killer, distance and the agent's state; `ipa` shows drug use per session. `replay <#|file> [--trace]` re-runs a session headlessly and says whether it still reproduces. `bot <mission> [rush|panic|careful|expert]` records a scripted squad the same way, so players and bots can be compared.
+- Pick a recording under "Watch a replay…" on the briefing screen (dev server), or open `?replay=<file>`, to watch it in the game's renderer. Nothing you do in the viewer changes the recording: the world is rebuilt from it and fed the recorded commands. Space pauses, ← → jump 5 s (Shift: 30 s), `,` `.` step a tick while paused, `[` `]` change speed (¼× to 8×), and the timeline can be scrubbed; its marks are the alarm, objectives and each agent's death. The camera follows the squad (Tab), one agent (1–4) or roams free (0, WASD, Q/E, wheel, F, Y). Overlays: T trails, K deaths (with a line to the killer), V enemy vision ranges, L aim lines, N labels (health and IPA). The panel also graphs each agent's IPA dose and dependency over the mission.
 
 ## Dev tooling
 

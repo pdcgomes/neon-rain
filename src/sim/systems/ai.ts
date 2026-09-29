@@ -134,7 +134,7 @@ function supportFire(world: World, e: Entity, range: number, requireActive: bool
 }
 
 /** How far an enemy with this weapon spots the squad; longer guns watch further, as in the original. */
-function sightRange(w: WeaponDef, alert: boolean): number {
+export function sightRange(w: WeaponDef, alert: boolean): number {
   return Math.min(balance.sightMax, w.range * balance.sightWeaponMul) * (alert ? 1 : balance.sightCalmMul);
 }
 

@@ -3,6 +3,7 @@ import { Controls } from './input/controls.ts';
 import { GameRenderer } from './render/renderer.ts';
 import type { Command } from './sim/commands.ts';
 import type { AgentDef, Content } from './sim/content.ts';
+import { Recorder } from './sim/telemetry.ts';
 import { DT, World } from './sim/world.ts';
 import { Hud } from './ui/hud.ts';
 
@@ -39,7 +40,10 @@ export class Game {
   private fpsAvg = 60;
   private hudAt = 0;
 
-  constructor(app: HTMLElement, content: Content, squad: AgentDef[], audio: AudioSystem | null, cb: GameCallbacks, seed?: number) {
+  /** Set when telemetry is on: records the mission for `scripts/telemetry.ts`. */
+  readonly recorder: Recorder | null;
+
+  constructor(app: HTMLElement, content: Content, squad: AgentDef[], audio: AudioSystem | null, cb: GameCallbacks, seed?: number, record?: string) {
     this.cb = cb;
     this.audio = audio;
     const old = document.getElementById('view');
@@ -49,6 +53,7 @@ export class Game {
     else app.prepend(this.canvas);
 
     this.world = new World(content, squad, seed);
+    this.recorder = record ? new Recorder(this.world, record, seed ?? content.mission.seed) : null;
     this.view = new GameRenderer(this.canvas, this.world);
     this.controls = new Controls(this.canvas, this.world, this.view, {
       onPause: () => this.togglePause(),
@@ -91,6 +96,7 @@ export class Game {
       while (this.acc >= DT && steps++ < MAX_STEPS_PER_FRAME) {
         const cmds = this.controls.tick();
         world.step(cmds);
+        this.recorder?.onStep(cmds);
         this.acc -= DT;
         this.consume();
       }
@@ -125,7 +131,9 @@ export class Game {
   /** Debug/automation: advance the sim without waiting for frames, optionally issuing commands first. */
   advance(ticks: number, commands: Command[] = []): number {
     for (let i = 0; i < ticks && this.world.phase !== 'success' && this.world.phase !== 'fail'; i++) {
-      this.world.step(i === 0 ? [...commands, ...this.controls.tick()] : this.controls.tick());
+      const cmds = i === 0 ? [...commands, ...this.controls.tick()] : this.controls.tick();
+      this.world.step(cmds);
+      this.recorder?.onStep(cmds);
       this.consume();
     }
     return this.world.tick;
