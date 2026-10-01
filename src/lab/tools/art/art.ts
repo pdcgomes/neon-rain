@@ -327,6 +327,7 @@ function build(root: HTMLElement, stage: Stage): Art {
       sidebar.focusSearch();
       return;
     }
+    if (mod) return;
     switch (e.code) {
       case 'ArrowUp':
         e.preventDefault();
